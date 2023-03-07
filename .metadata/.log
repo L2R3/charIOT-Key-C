@@ -13,3 +13,49 @@ Command-line arguments:  -os win32 -ws win32 -arch x86_64
 
 !ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2023-03-07 18:51:42.899
 !MESSAGE Started RMI Server, listening on port 41337
+!SESSION 2023-03-07 23:27:56.289 -----------------------------------------------
+eclipse.buildId=Version 1.12.0
+java.version=11.0.17
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_GB
+Command-line arguments:  -os win32 -ws win32 -arch x86_64
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2023-03-07 23:28:04.882
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2023-03-07 23:28:04.883
+!MESSAGE Log4j2 initialized with config file C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2023-03-07 23:28:08.203
+!MESSAGE Started RMI Server, listening on port 41337
+!SESSION 2023-03-07 23:28:39.697 -----------------------------------------------
+eclipse.buildId=Version 1.12.0
+java.version=11.0.17
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_GB
+Command-line arguments:  -os win32 -ws win32 -arch x86_64
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2023-03-07 23:28:48.954
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2023-03-07 23:28:48.955
+!MESSAGE Log4j2 initialized with config file C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2023-03-07 23:28:51.514
+!MESSAGE Started RMI Server, listening on port 41337
+!SESSION 2023-03-07 23:29:55.998 -----------------------------------------------
+eclipse.buildId=Version 1.12.0
+java.version=11.0.17
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_GB
+Framework arguments:  C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C\.project
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C\.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2023-03-07 23:30:03.540
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2023-03-07 23:30:03.542
+!MESSAGE Log4j2 initialized with config file C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2023-03-07 23:30:06.090
+!MESSAGE Started RMI Server, listening on port 41337
