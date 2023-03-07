@@ -11,6 +11,9 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
+
+#include "csrc/u8g2.h"
 
 /* USER CODE END Includes */
 
@@ -90,6 +93,9 @@ void displayUpdateTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
+void serialPrint(char val[]);
+void serialPrintln(char val[]);
+
 void delayMicro(uint16_t us);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value);
@@ -159,7 +165,7 @@ int main(void) {
 	HAL_Delay(1); // u8g2.begin();
 	setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
 
-	// start USART2 UART
+	serialPrintln("charIOT-Key-C");
 
 	/* USER CODE END 2 */
 
@@ -208,7 +214,6 @@ int main(void) {
 
 	/* Start scheduler */
 	osKernelStart();
-
 	/* We should never get here as control is now taken by the scheduler */
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
@@ -216,7 +221,6 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
 	}
 	/* USER CODE END 3 */
 }
@@ -572,6 +576,8 @@ static void MX_USART2_UART_Init(void) {
  */
 static void MX_GPIO_Init(void) {
 	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+	/* USER CODE BEGIN MX_GPIO_Init_1 */
+	/* USER CODE END MX_GPIO_Init_1 */
 
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOC_CLK_ENABLE();
@@ -583,7 +589,8 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB,
-	RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin, GPIO_PIN_RESET);
+			RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin,
+			GPIO_PIN_RESET);
 
 	/*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
 	GPIO_InitStruct.Pin = C0_Pin | C2_Pin | C1_Pin | C3_Pin;
@@ -607,9 +614,25 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+	/* USER CODE BEGIN MX_GPIO_Init_2 */
+	/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+void serialPrint(char val[]) {
+
+	HAL_UART_Transmit(&huart2, (uint8_t*) val, strlen(val), 10);
+
+}
+
+void serialPrintln(char val[]) {
+
+	HAL_UART_Transmit(&huart2, (uint8_t*) val, strlen(val), 10);
+	char newline[2] = "\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t*) newline, 2, 10);
+
+}
 
 void delayMicro(uint16_t us) {
 
