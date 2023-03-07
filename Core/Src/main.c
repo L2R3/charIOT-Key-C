@@ -13,7 +13,9 @@
 #include <stdbool.h>
 #include <string.h>
 
+// display
 #include "csrc/u8g2.h"
+// CAN bus
 
 /* USER CODE END Includes */
 
@@ -53,11 +55,12 @@ const osThreadAttr_t defaultTask_attributes = { .name = "defaultTask",
 /* Definitions for scanKeys */
 osThreadId_t scanKeysHandle;
 const osThreadAttr_t scanKeys_attributes = { .name = "scanKeys", .stack_size =
-		64 * 4, .priority = (osPriority_t) osPriorityLow, };
+		128 * 4, .priority = (osPriority_t) osPriorityLow, };
 /* Definitions for displayUpdate */
 osThreadId_t displayUpdateHandle;
-const osThreadAttr_t displayUpdate_attributes = { .name = "displayUpdate",
-		.stack_size = 64 * 4, .priority = (osPriority_t) osPriorityLow, };
+const osThreadAttr_t displayUpdate_attributes =
+		{ .name = "displayUpdate", .stack_size = 128 * 4, .priority =
+				(osPriority_t) osPriorityBelowNormal, };
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
 const osMutexAttr_t keysMutex_attributes = { .name = "keysMutex" };
@@ -67,6 +70,8 @@ const int DEN_BIT = 3;
 const int DRST_BIT = 4;
 const int HKOW_BIT = 5;
 const int HKOE_BIT = 6;
+
+u8g2_t u8g2;
 
 const float fs = 22000;
 const float fA = 440;
@@ -95,14 +100,15 @@ void displayUpdateTask(void *argument);
 
 void serialPrint(char val[]);
 void serialPrintln(char val[]);
-
 void delayMicro(uint16_t us);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value);
+uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
+		void *arg_ptr);
+uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 
 void setRow(uint8_t rowIdx);
 uint8_t readCols();
-
 uint16_t readKeys();
 
 void rotationSteps(float *dreal, float *dimag);
@@ -162,7 +168,11 @@ int main(void) {
 	setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
 	delayMicro(2);
 	setOutMuxBit(DRST_BIT, GPIO_PIN_SET);
-	HAL_Delay(1); // u8g2.begin();
+	u8g2_Setup_ssd1305_i2c_128x32_noname_f(&u8g2, U8G2_R0, u8x8_byte_i2c,
+			u8x8_gpio_and_delay);
+	u8g2_InitDisplay(&u8g2);
+	u8g2_ClearDisplay(&u8g2);
+	u8g2_SetPowerSave(&u8g2, 0);
 	setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
 
 	serialPrintln("charIOT-Key-C");
@@ -217,11 +227,9 @@ int main(void) {
 	/* We should never get here as control is now taken by the scheduler */
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {
-		/* USER CODE END WHILE */
+	/* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
-	}
+	/* USER CODE BEGIN 3 */
 	/* USER CODE END 3 */
 }
 
@@ -434,7 +442,7 @@ static void MX_I2C1_Init(void) {
 
 	/* USER CODE END I2C1_Init 1 */
 	hi2c1.Instance = I2C1;
-	hi2c1.Init.Timing = 0x00909BEB;
+	hi2c1.Init.Timing = 0x00100618;
 	hi2c1.Init.OwnAddress1 = 0;
 	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
 	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -458,6 +466,10 @@ static void MX_I2C1_Init(void) {
 	if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) {
 		Error_Handler();
 	}
+
+	/** I2C Fast mode Plus enable
+	 */
+	HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_I2C1);
 	/* USER CODE BEGIN I2C1_Init 2 */
 
 	/* USER CODE END I2C1_Init 2 */
@@ -589,8 +601,7 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB,
-			RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin,
-			GPIO_PIN_RESET);
+	RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
 	GPIO_InitStruct.Pin = C0_Pin | C2_Pin | C1_Pin | C3_Pin;
@@ -652,6 +663,47 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
 	delayMicro(2);
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+
+}
+
+uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
+		void *arg_ptr) {
+
+	return 1;
+
+}
+
+uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr) {
+
+	static uint8_t buffer[32];
+	static uint8_t buf_idx;
+	uint8_t *data;
+
+	switch (msg) {
+	case U8X8_MSG_BYTE_SEND:
+		data = (uint8_t*) arg_ptr;
+		while (arg_int > 0) {
+			buffer[buf_idx++] = *data;
+			data++;
+			arg_int--;
+		}
+		break;
+	case U8X8_MSG_BYTE_INIT:
+		break;
+	case U8X8_MSG_BYTE_SET_DC:
+		break;
+	case U8X8_MSG_BYTE_START_TRANSFER:
+		buf_idx = 0;
+		break;
+	case U8X8_MSG_BYTE_END_TRANSFER:
+		HAL_I2C_Master_Transmit(&hi2c1, u8x8_GetI2CAddress(u8x8),
+				(uint8_t*) buffer, buf_idx, HAL_MAX_DELAY);
+		break;
+	default:
+		return 0;
+	}
+
+	return 1;
 
 }
 
@@ -776,9 +828,27 @@ void displayUpdateTask(void *argument) {
 
 		osMutexAcquire(keysMutexHandle, osWaitForever);
 
+		uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+
 		osMutexRelease(keysMutexHandle);
 
+		u8g2_ClearBuffer(&u8g2);
+		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+
+		if (localKeys == 0x0FFF) {
+
+			u8g2_DrawStr(&u8g2, 2, 20, "- ^_^ -");
+
+		} else {
+
+			u8g2_DrawStr(&u8g2, 2, 20, "- ^0^ -");
+
+		}
+
+		u8g2_SendBuffer(&u8g2);
+
 	}
+
 	/* USER CODE END displayUpdateTask */
 }
 
@@ -805,13 +875,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 		float Vadd = 0;
 
-		uint16_t keysbuff;
+		uint16_t localKeys;
 
-		keysbuff = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+		localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
 
 		for (int i = 0; i < 12; i++) {
 
-			if (!(keysbuff & 1)) {
+			if (!(localKeys & 1)) {
 
 				real2 = dreal[i] * real[i] - dimag[i] * imag[i];
 				imag2 = dimag[i] * real[i] + dreal[i] * imag[i];
@@ -823,7 +893,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			}
 
-			keysbuff >>= 1;
+			localKeys >>= 1;
 
 		}
 
