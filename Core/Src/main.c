@@ -22,6 +22,11 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef struct {
+	uint8_t buf[8];
+	uint8_t idx;
+} CAN_MSG_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -69,6 +74,18 @@ const osThreadAttr_t displayUpdate_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for decodeTask */
+osThreadId_t decodeTaskHandle;
+const osThreadAttr_t decodeTask_attributes = {
+  .name = "decodeTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for msgInQ */
+osMessageQueueId_t msgInQHandle;
+const osMessageQueueAttr_t msgInQ_attributes = {
+  .name = "msgInQ"
+};
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
 const osMutexAttr_t keysMutex_attributes = {
@@ -90,7 +107,7 @@ float dimag[12];
 
 volatile uint16_t keys = 0x0FFF;
 
-uint8_t TX_Message[8] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' };
+uint8_t TX_Message[8] = { 'A', 'L', 'I', 'B', 'E', 'S', 'T', '!' };
 
 /* USER CODE END PV */
 
@@ -107,6 +124,7 @@ static void MX_TIM7_Init(void);
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
 void displayUpdateTask(void *argument);
+void decode(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -117,7 +135,7 @@ void delayMicro(uint16_t us);
 uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank);
 uint32_t CAN_TX(uint32_t ID, uint8_t data[8]);
 uint32_t CAN_CheckRXLevel();
-uint32_t CAN_RX(uint32_t* ID, uint8_t data[8]);
+uint32_t CAN_RX(uint32_t *ID, uint8_t data[8]);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value);
 uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
@@ -195,33 +213,38 @@ int main(void)
 
 	setCANFilter(0x123, 0x7ff, 0);
 	HAL_CAN_Start(&hcan1);
-//	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 //	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
+
+//	HAL_NVIC_SetPriority (CAN1_RX0_IRQn, 6, 0);
+//	HAL_NVIC_EnableIRQ (CAN1_RX0_IRQn);
 
 	serialPrintln("charIOT-Key-C");
 
-	while (1) {
-
-		CAN_TX(0x123, TX_Message);
-
-		uint32_t ID = 0x111;
-		uint8_t RX_Message[8] = { 0 };
-		char IDtext[2];
-
-		while (CAN_CheckRXLevel()) {
-			CAN_RX(&ID, RX_Message);
-		}
-
-		sprintf(IDtext, "%lX", ID);
-
-		u8g2_ClearBuffer(&u8g2);
-		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-		u8g2_DrawStr(&u8g2, 2, 20, IDtext);
-		u8g2_SendBuffer(&u8g2);
-
-		HAL_Delay(1000);
-
-	}
+//	while (1) {
+//
+//		CAN_TX(0x123, TX_Message);
+//
+//		uint32_t ID = 0x111;
+//		uint8_t RX_Message[8] = { 0 };
+//		char IDtext[2];
+//
+//		while (CAN_CheckRXLevel()) {
+//			CAN_RX(&ID, RX_Message);
+//		}
+//
+//		sprintf(IDtext, "%lX", ID);
+//
+//		serialPrintln((char*) RX_Message);
+//
+//		u8g2_ClearBuffer(&u8g2);
+//		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+//		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX_Message);
+//		u8g2_SendBuffer(&u8g2);
+//
+//		HAL_Delay(1000);
+//
+//	}
 
   /* USER CODE END 2 */
 
@@ -244,6 +267,10 @@ int main(void)
 	/* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of msgInQ */
+  msgInQHandle = osMessageQueueNew (36, sizeof(CAN_MSG_t), &msgInQ_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -257,6 +284,9 @@ int main(void)
 
   /* creation of displayUpdate */
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
+
+  /* creation of decodeTask */
+  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -412,7 +442,7 @@ static void MX_CAN1_Init(void)
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
   hcan1.Init.Prescaler = 40;
-  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.Mode = CAN_MODE_LOOPBACK;
   hcan1.Init.SyncJumpWidth = CAN_SJW_2TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
@@ -763,7 +793,7 @@ uint32_t CAN_CheckRXLevel() {
 
 }
 
-uint32_t CAN_RX(uint32_t* ID, uint8_t data[8]) {
+uint32_t CAN_RX(uint32_t *ID, uint8_t data[8]) {
 
 	CAN_RxHeaderTypeDef rxHeader;
 
@@ -888,6 +918,25 @@ void rotationSteps(float *dreal, float *dimag) {
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
+//	HAL_GPIO_TogglePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin);
+
+//	uint8_t RX_Message_ISR[8];
+	uint32_t ID;
+	CAN_MSG_t RX_Message;
+	CAN_RX(&ID, RX_Message.buf);
+	osMessageQueuePut(msgInQHandle, &RX_Message, 0, 0);
+
+//	uint32_t count = osMessageQueueGetCount(msgInQHandle);
+
+//	char IDtext[3];
+//
+//	sprintf(IDtext, "%lX", count);
+
+//	u8g2_ClearBuffer(&u8g2);
+//	u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+//	u8g2_DrawStr(&u8g2, 2, 20, (char*) RX_Message.buf);
+//	u8g2_SendBuffer(&u8g2);
+
 }
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
@@ -948,6 +997,8 @@ void scanKeysTask(void *argument)
 
 		osMutexRelease(keysMutexHandle);
 
+		CAN_TX(0x123, TX_Message);
+
 	}
   /* USER CODE END scanKeysTask */
 }
@@ -977,24 +1028,52 @@ void displayUpdateTask(void *argument)
 
 		osMutexRelease(keysMutexHandle);
 
-		u8g2_ClearBuffer(&u8g2);
-		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-
-		if (localKeys == 0x0FFF) {
-
-			u8g2_DrawStr(&u8g2, 2, 20, "- ^_^ -");
-
-		} else {
-
-			u8g2_DrawStr(&u8g2, 2, 20, "- ^0^ -");
-
-		}
-
-		u8g2_SendBuffer(&u8g2);
+//		u8g2_ClearBuffer(&u8g2);
+//		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+//
+//		if (localKeys == 0x0FFF) {
+//
+//			u8g2_DrawStr(&u8g2, 2, 20, "- ^_^ -");
+//
+//		} else {
+//
+//			u8g2_DrawStr(&u8g2, 2, 20, "- ^0^ -");
+//
+//		}
+//
+//		u8g2_SendBuffer(&u8g2);
 
 	}
 
   /* USER CODE END displayUpdateTask */
+}
+
+/* USER CODE BEGIN Header_decode */
+/**
+ * @brief Function implementing the decodeTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_decode */
+void decode(void *argument)
+{
+  /* USER CODE BEGIN decode */
+	/* Infinite loop */
+	for (;;) {
+
+//		uint8_t RX_Message[8];
+
+		CAN_MSG_t RX_Message;
+
+		osMessageQueueGet(msgInQHandle, &RX_Message, NULL, osWaitForever);
+
+		u8g2_ClearBuffer(&u8g2);
+		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX_Message.buf);
+		u8g2_SendBuffer(&u8g2);
+
+	}
+  /* USER CODE END decode */
 }
 
 /**
@@ -1011,7 +1090,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if (htim == &htim6) {
 
-		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+//		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
 
 		static float real[12] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 		static float imag[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -1049,8 +1128,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, Vout + 2048);
 		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_2, DAC_ALIGN_12B_R, Vout + 2048);
 
-		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin,
-				GPIO_PIN_RESET);
+//		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin,
+//				GPIO_PIN_RESET);
 
 	}
 
