@@ -23,8 +23,8 @@
 /* USER CODE BEGIN PTD */
 
 typedef struct {
-	uint8_t buf[8];
-	uint8_t idx;
+	uint8_t Message[8];
+	uint32_t ID;
 } CAN_MSG_t;
 
 /* USER CODE END PTD */
@@ -107,7 +107,7 @@ float dimag[12];
 
 volatile uint16_t keys = 0x0FFF;
 
-uint8_t TX_Message[8] = { 'A', 'L', 'I', 'B', 'E', 'S', 'T', '!' };
+uint8_t TX_Message[8] = "ALIBEST!";
 
 /* USER CODE END PV */
 
@@ -215,9 +215,6 @@ int main(void)
 	HAL_CAN_Start(&hcan1);
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 //	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
-
-//	HAL_NVIC_SetPriority (CAN1_RX0_IRQn, 6, 0);
-//	HAL_NVIC_EnableIRQ (CAN1_RX0_IRQn);
 
 	serialPrintln("charIOT-Key-C");
 
@@ -918,13 +915,9 @@ void rotationSteps(float *dreal, float *dimag) {
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
-//	HAL_GPIO_TogglePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin);
-
-//	uint8_t RX_Message_ISR[8];
-	uint32_t ID;
-	CAN_MSG_t RX_Message;
-	CAN_RX(&ID, RX_Message.buf);
-	osMessageQueuePut(msgInQHandle, &RX_Message, 0, 0);
+	CAN_MSG_t RX;
+	CAN_RX(&RX.ID, RX.Message);
+	osMessageQueuePut(msgInQHandle, &RX.Message, 0, 0);
 
 //	uint32_t count = osMessageQueueGetCount(msgInQHandle);
 
@@ -1061,15 +1054,18 @@ void decode(void *argument)
 	/* Infinite loop */
 	for (;;) {
 
-//		uint8_t RX_Message[8];
+		CAN_MSG_t RX;
 
-		CAN_MSG_t RX_Message;
+		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
-		osMessageQueueGet(msgInQHandle, &RX_Message, NULL, osWaitForever);
+		char hexID[3];
+
+		sprintf(hexID, "%lX", RX.ID);
 
 		u8g2_ClearBuffer(&u8g2);
 		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX_Message.buf);
+		u8g2_DrawStr(&u8g2, 2, 10, hexID);
+		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX.Message);
 		u8g2_SendBuffer(&u8g2);
 
 	}
