@@ -55,42 +55,37 @@ UART_HandleTypeDef huart2;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
+const osThreadAttr_t defaultTask_attributes = { .name = "defaultTask",
+		.stack_size = 128 * 4, .priority = (osPriority_t) osPriorityNormal, };
 /* Definitions for scanKeys */
 osThreadId_t scanKeysHandle;
-const osThreadAttr_t scanKeys_attributes = {
-  .name = "scanKeys",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityBelowNormal,
-};
+const osThreadAttr_t scanKeys_attributes = { .name = "scanKeys", .stack_size =
+		128 * 4, .priority = (osPriority_t) osPriorityBelowNormal, };
 /* Definitions for displayUpdate */
 osThreadId_t displayUpdateHandle;
-const osThreadAttr_t displayUpdate_attributes = {
-  .name = "displayUpdate",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
+const osThreadAttr_t displayUpdate_attributes = { .name = "displayUpdate",
+		.stack_size = 128 * 4, .priority = (osPriority_t) osPriorityLow, };
 /* Definitions for decodeTask */
 osThreadId_t decodeTaskHandle;
-const osThreadAttr_t decodeTask_attributes = {
-  .name = "decodeTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
+const osThreadAttr_t decodeTask_attributes = { .name = "decodeTask",
+		.stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
+/* Definitions for CAN_TX_TaskName */
+osThreadId_t CAN_TX_TaskNameHandle;
+const osThreadAttr_t CAN_TX_TaskName_attributes = { .name = "CAN_TX_TaskName",
+		.stack_size = 128 * 4, .priority = (osPriority_t) osPriorityLow, };
 /* Definitions for msgInQ */
 osMessageQueueId_t msgInQHandle;
-const osMessageQueueAttr_t msgInQ_attributes = {
-  .name = "msgInQ"
-};
+const osMessageQueueAttr_t msgInQ_attributes = { .name = "msgInQ" };
+/* Definitions for msgOutQ */
+osMessageQueueId_t msgOutQHandle;
+const osMessageQueueAttr_t msgOutQ_attributes = { .name = "msgOutQ" };
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
-const osMutexAttr_t keysMutex_attributes = {
-  .name = "keysMutex"
-};
+const osMutexAttr_t keysMutex_attributes = { .name = "keysMutex" };
+/* Definitions for CAN_TX_Semaphore */
+osSemaphoreId_t CAN_TX_SemaphoreHandle;
+const osSemaphoreAttr_t CAN_TX_Semaphore_attributes = { .name =
+		"CAN_TX_Semaphore" };
 /* USER CODE BEGIN PV */
 
 const int DEN_BIT = 3;
@@ -107,7 +102,7 @@ float dimag[12];
 
 volatile uint16_t keys = 0x0FFF;
 
-uint8_t TX_Message[8] = "ALIBEST!";
+//uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
 
 /* USER CODE END PV */
 
@@ -125,6 +120,7 @@ void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
 void displayUpdateTask(void *argument);
 void decode(void *argument);
+void CAN_Transmit(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -156,43 +152,42 @@ void rotationSteps(float *dreal, float *dimag);
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
+ * @brief  The application entry point.
+ * @retval int
+ */
+int main(void) {
+	/* USER CODE BEGIN 1 */
 
 	rotationSteps(dreal, dimag);
 
-  /* USER CODE END 1 */
+	/* USER CODE END 1 */
 
-  /* MCU Configuration--------------------------------------------------------*/
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+	/* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE BEGIN SysInit */
 
-  /* USER CODE END SysInit */
+	/* USER CODE END SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_CAN1_Init();
-  MX_I2C1_Init();
-  MX_ADC1_Init();
-  MX_DAC1_Init();
-  MX_TIM6_Init();
-  MX_TIM7_Init();
-  /* USER CODE BEGIN 2 */
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_USART2_UART_Init();
+	MX_CAN1_Init();
+	MX_I2C1_Init();
+	MX_ADC1_Init();
+	MX_DAC1_Init();
+	MX_TIM6_Init();
+	MX_TIM7_Init();
+	/* USER CODE BEGIN 2 */
 
 	HAL_TIM_Base_Start(&htim7);
 
@@ -214,7 +209,7 @@ int main(void)
 	setCANFilter(0x123, 0x7ff, 0);
 	HAL_CAN_Start(&hcan1);
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
-//	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
+	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
 
 	serialPrintln("charIOT-Key-C");
 
@@ -243,482 +238,477 @@ int main(void)
 //
 //	}
 
-  /* USER CODE END 2 */
+	/* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-  /* Create the mutex(es) */
-  /* creation of keysMutex */
-  keysMutexHandle = osMutexNew(&keysMutex_attributes);
+	/* Init scheduler */
+	osKernelInitialize();
+	/* Create the mutex(es) */
+	/* creation of keysMutex */
+	keysMutexHandle = osMutexNew(&keysMutex_attributes);
 
-  /* USER CODE BEGIN RTOS_MUTEX */
+	/* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
 	osMutexRelease(keysMutexHandle);
-  /* USER CODE END RTOS_MUTEX */
+	/* USER CODE END RTOS_MUTEX */
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
+	/* Create the semaphores(s) */
+	/* creation of CAN_TX_Semaphore */
+	CAN_TX_SemaphoreHandle = osSemaphoreNew(3, 3, &CAN_TX_Semaphore_attributes);
+
+	/* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+	osSemaphoreRelease(CAN_TX_SemaphoreHandle);
+	/* USER CODE END RTOS_SEMAPHORES */
 
-  /* USER CODE BEGIN RTOS_TIMERS */
+	/* USER CODE BEGIN RTOS_TIMERS */
 	/* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
+	/* USER CODE END RTOS_TIMERS */
 
-  /* Create the queue(s) */
-  /* creation of msgInQ */
-  msgInQHandle = osMessageQueueNew (36, sizeof(CAN_MSG_t), &msgInQ_attributes);
+	/* Create the queue(s) */
+	/* creation of msgInQ */
+	msgInQHandle = osMessageQueueNew(36, sizeof(CAN_MSG_t), &msgInQ_attributes);
 
-  /* USER CODE BEGIN RTOS_QUEUES */
+	/* creation of msgOutQ */
+	msgOutQHandle = osMessageQueueNew(36, sizeof(CAN_MSG_t),
+			&msgOutQ_attributes);
+
+	/* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
+	/* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+	/* Create the thread(s) */
+	/* creation of defaultTask */
+	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL,
+			&defaultTask_attributes);
 
-  /* creation of scanKeys */
-  scanKeysHandle = osThreadNew(scanKeysTask, NULL, &scanKeys_attributes);
+	/* creation of scanKeys */
+	scanKeysHandle = osThreadNew(scanKeysTask, NULL, &scanKeys_attributes);
 
-  /* creation of displayUpdate */
-  displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
+	/* creation of displayUpdate */
+	displayUpdateHandle = osThreadNew(displayUpdateTask, NULL,
+			&displayUpdate_attributes);
 
-  /* creation of decodeTask */
-  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
+	/* creation of decodeTask */
+	decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
 
-  /* USER CODE BEGIN RTOS_THREADS */
+	/* creation of CAN_TX_TaskName */
+	CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL,
+			&CAN_TX_TaskName_attributes);
+
+	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+	/* USER CODE END RTOS_THREADS */
 
-  /* USER CODE BEGIN RTOS_EVENTS */
+	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
+	/* USER CODE END RTOS_EVENTS */
 
-  /* Start scheduler */
-  osKernelStart();
-  /* We should never get here as control is now taken by the scheduler */
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-    /* USER CODE END WHILE */
+	/* Start scheduler */
+	osKernelStart();
+	/* We should never get here as control is now taken by the scheduler */
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+	/* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-  /* USER CODE END 3 */
+	/* USER CODE BEGIN 3 */
+	/* USER CODE END 3 */
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void) {
+	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
 
-  /** Configure the main internal regulator output voltage
-  */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure the main internal regulator output voltage
+	 */
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1)
+			!= HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure LSE Drive Capability
-  */
-  HAL_PWR_EnableBkUpAccess();
-  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+	/** Configure LSE Drive Capability
+	 */
+	HAL_PWR_EnableBkUpAccess();
+	__HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 40;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Initializes the RCC Oscillators according to the specified parameters
+	 * in the RCC_OscInitTypeDef structure.
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE
+			| RCC_OSCILLATORTYPE_MSI;
+	RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+	RCC_OscInitStruct.MSICalibrationValue = 0;
+	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
+	RCC_OscInitStruct.PLL.PLLM = 1;
+	RCC_OscInitStruct.PLL.PLLN = 40;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+	/** Initializes the CPU, AHB and APB buses clocks
+	 */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Enable MSI Auto calibration
-  */
-  HAL_RCCEx_EnableMSIPLLMode();
+	/** Enable MSI Auto calibration
+	 */
+	HAL_RCCEx_EnableMSIPLLMode();
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC1_Init(void) {
 
-  /* USER CODE BEGIN ADC1_Init 0 */
+	/* USER CODE BEGIN ADC1_Init 0 */
 
-  /* USER CODE END ADC1_Init 0 */
+	/* USER CODE END ADC1_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
+	ADC_ChannelConfTypeDef sConfig = { 0 };
 
-  /* USER CODE BEGIN ADC1_Init 1 */
+	/* USER CODE BEGIN ADC1_Init 1 */
 
-  /* USER CODE END ADC1_Init 1 */
+	/* USER CODE END ADC1_Init 1 */
 
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc1.Init.OversamplingMode = DISABLE;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Common config
+	 */
+	hadc1.Instance = ADC1;
+	hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+	hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+	hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+	hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+	hadc1.Init.LowPowerAutoWait = DISABLE;
+	hadc1.Init.ContinuousConvMode = DISABLE;
+	hadc1.Init.NbrOfConversion = 1;
+	hadc1.Init.DiscontinuousConvMode = DISABLE;
+	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+	hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+	hadc1.Init.DMAContinuousRequests = DISABLE;
+	hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+	hadc1.Init.OversamplingMode = DISABLE;
+	if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_5;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
-  sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.OffsetNumber = ADC_OFFSET_NONE;
-  sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_5;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+	sConfig.SingleDiff = ADC_SINGLE_ENDED;
+	sConfig.OffsetNumber = ADC_OFFSET_NONE;
+	sConfig.Offset = 0;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN ADC1_Init 2 */
 
-  /* USER CODE END ADC1_Init 2 */
+	/* USER CODE END ADC1_Init 2 */
 
 }
 
 /**
-  * @brief CAN1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_CAN1_Init(void)
-{
+ * @brief CAN1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_CAN1_Init(void) {
 
-  /* USER CODE BEGIN CAN1_Init 0 */
+	/* USER CODE BEGIN CAN1_Init 0 */
 
-  /* USER CODE END CAN1_Init 0 */
+	/* USER CODE END CAN1_Init 0 */
 
-  /* USER CODE BEGIN CAN1_Init 1 */
+	/* USER CODE BEGIN CAN1_Init 1 */
 
-  /* USER CODE END CAN1_Init 1 */
-  hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 40;
-  hcan1.Init.Mode = CAN_MODE_LOOPBACK;
-  hcan1.Init.SyncJumpWidth = CAN_SJW_2TQ;
-  hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
-  hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
-  hcan1.Init.TimeTriggeredMode = DISABLE;
-  hcan1.Init.AutoBusOff = DISABLE;
-  hcan1.Init.AutoWakeUp = ENABLE;
-  hcan1.Init.AutoRetransmission = ENABLE;
-  hcan1.Init.ReceiveFifoLocked = DISABLE;
-  hcan1.Init.TransmitFifoPriority = ENABLE;
-  if (HAL_CAN_Init(&hcan1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN CAN1_Init 2 */
+	/* USER CODE END CAN1_Init 1 */
+	hcan1.Instance = CAN1;
+	hcan1.Init.Prescaler = 40;
+	hcan1.Init.Mode = CAN_MODE_LOOPBACK;
+	hcan1.Init.SyncJumpWidth = CAN_SJW_2TQ;
+	hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
+	hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
+	hcan1.Init.TimeTriggeredMode = DISABLE;
+	hcan1.Init.AutoBusOff = DISABLE;
+	hcan1.Init.AutoWakeUp = ENABLE;
+	hcan1.Init.AutoRetransmission = ENABLE;
+	hcan1.Init.ReceiveFifoLocked = DISABLE;
+	hcan1.Init.TransmitFifoPriority = ENABLE;
+	if (HAL_CAN_Init(&hcan1) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN CAN1_Init 2 */
 
-  /* USER CODE END CAN1_Init 2 */
+	/* USER CODE END CAN1_Init 2 */
 
 }
 
 /**
-  * @brief DAC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_DAC1_Init(void)
-{
+ * @brief DAC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_DAC1_Init(void) {
 
-  /* USER CODE BEGIN DAC1_Init 0 */
+	/* USER CODE BEGIN DAC1_Init 0 */
 
-  /* USER CODE END DAC1_Init 0 */
+	/* USER CODE END DAC1_Init 0 */
 
-  DAC_ChannelConfTypeDef sConfig = {0};
+	DAC_ChannelConfTypeDef sConfig = { 0 };
 
-  /* USER CODE BEGIN DAC1_Init 1 */
+	/* USER CODE BEGIN DAC1_Init 1 */
 
-  /* USER CODE END DAC1_Init 1 */
+	/* USER CODE END DAC1_Init 1 */
 
-  /** DAC Initialization
-  */
-  hdac1.Instance = DAC1;
-  if (HAL_DAC_Init(&hdac1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** DAC Initialization
+	 */
+	hdac1.Instance = DAC1;
+	if (HAL_DAC_Init(&hdac1) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** DAC channel OUT1 config
-  */
-  sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_T6_TRGO;
-  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
-  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
-  sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
-  if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** DAC channel OUT1 config
+	 */
+	sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
+	sConfig.DAC_Trigger = DAC_TRIGGER_T6_TRGO;
+	sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+	sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
+	sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
+	if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_1) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** DAC channel OUT2 config
-  */
-  if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN DAC1_Init 2 */
+	/** DAC channel OUT2 config
+	 */
+	if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_2) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN DAC1_Init 2 */
 
-  /* USER CODE END DAC1_Init 2 */
+	/* USER CODE END DAC1_Init 2 */
 
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_I2C1_Init(void) {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+	/* USER CODE BEGIN I2C1_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+	/* USER CODE END I2C1_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+	/* USER CODE BEGIN I2C1_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00300F33;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/* USER CODE END I2C1_Init 1 */
+	hi2c1.Instance = I2C1;
+	hi2c1.Init.Timing = 0x00300F33;
+	hi2c1.Init.OwnAddress1 = 0;
+	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+	hi2c1.Init.OwnAddress2 = 0;
+	hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+	if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Analogue filter
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Analogue filter
+	 */
+	if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE)
+			!= HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Digital filter
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Digital filter
+	 */
+	if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** I2C Fast mode Plus enable
-  */
-  HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_I2C1);
-  /* USER CODE BEGIN I2C1_Init 2 */
+	/** I2C Fast mode Plus enable
+	 */
+	HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_I2C1);
+	/* USER CODE BEGIN I2C1_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+	/* USER CODE END I2C1_Init 2 */
 
 }
 
 /**
-  * @brief TIM6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM6_Init(void)
-{
+ * @brief TIM6 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM6_Init(void) {
 
-  /* USER CODE BEGIN TIM6_Init 0 */
+	/* USER CODE BEGIN TIM6_Init 0 */
 
-  /* USER CODE END TIM6_Init 0 */
+	/* USER CODE END TIM6_Init 0 */
 
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
 
-  /* USER CODE BEGIN TIM6_Init 1 */
+	/* USER CODE BEGIN TIM6_Init 1 */
 
-  /* USER CODE END TIM6_Init 1 */
-  htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 0;
-  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 3636-1;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM6_Init 2 */
+	/* USER CODE END TIM6_Init 1 */
+	htim6.Instance = TIM6;
+	htim6.Init.Prescaler = 0;
+	htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim6.Init.Period = 3636 - 1;
+	htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim6) != HAL_OK) {
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM6_Init 2 */
 
-  /* USER CODE END TIM6_Init 2 */
+	/* USER CODE END TIM6_Init 2 */
 
 }
 
 /**
-  * @brief TIM7 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM7_Init(void)
-{
+ * @brief TIM7 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM7_Init(void) {
 
-  /* USER CODE BEGIN TIM7_Init 0 */
+	/* USER CODE BEGIN TIM7_Init 0 */
 
-  /* USER CODE END TIM7_Init 0 */
+	/* USER CODE END TIM7_Init 0 */
 
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
 
-  /* USER CODE BEGIN TIM7_Init 1 */
+	/* USER CODE BEGIN TIM7_Init 1 */
 
-  /* USER CODE END TIM7_Init 1 */
-  htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 80-1;
-  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 1000-1;
-  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM7_Init 2 */
+	/* USER CODE END TIM7_Init 1 */
+	htim7.Instance = TIM7;
+	htim7.Init.Prescaler = 80 - 1;
+	htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim7.Init.Period = 1000 - 1;
+	htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim7) != HAL_OK) {
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM7_Init 2 */
 
-  /* USER CODE END TIM7_Init 2 */
+	/* USER CODE END TIM7_Init 2 */
 
 }
 
 /**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
+ * @brief USART2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART2_UART_Init(void) {
 
-  /* USER CODE BEGIN USART2_Init 0 */
+	/* USER CODE BEGIN USART2_Init 0 */
 
-  /* USER CODE END USART2_Init 0 */
+	/* USER CODE END USART2_Init 0 */
 
-  /* USER CODE BEGIN USART2_Init 1 */
+	/* USER CODE BEGIN USART2_Init 1 */
 
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
+	/* USER CODE END USART2_Init 1 */
+	huart2.Instance = USART2;
+	huart2.Init.BaudRate = 115200;
+	huart2.Init.WordLength = UART_WORDLENGTH_8B;
+	huart2.Init.StopBits = UART_STOPBITS_1;
+	huart2.Init.Parity = UART_PARITY_NONE;
+	huart2.Init.Mode = UART_MODE_TX_RX;
+	huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	if (HAL_UART_Init(&huart2) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN USART2_Init 2 */
 
-  /* USER CODE END USART2_Init 2 */
+	/* USER CODE END USART2_Init 2 */
 
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_GPIO_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+	/* USER CODE BEGIN MX_GPIO_Init_1 */
+	/* USER CODE END MX_GPIO_Init_1 */
 
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, RA0_Pin|RA1_Pin|LED_BUILTIN_Pin|RA2_Pin
-                          |OUT_Pin, GPIO_PIN_RESET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOB,
+			RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin,
+			GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
-  GPIO_InitStruct.Pin = C0_Pin|C2_Pin|C1_Pin|C3_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	/*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
+	GPIO_InitStruct.Pin = C0_Pin | C2_Pin | C1_Pin | C3_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : REN_Pin */
-  GPIO_InitStruct.Pin = REN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(REN_GPIO_Port, &GPIO_InitStruct);
+	/*Configure GPIO pin : REN_Pin */
+	GPIO_InitStruct.Pin = REN_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(REN_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RA0_Pin RA1_Pin LED_BUILTIN_Pin RA2_Pin
-                           OUT_Pin */
-  GPIO_InitStruct.Pin = RA0_Pin|RA1_Pin|LED_BUILTIN_Pin|RA2_Pin
-                          |OUT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/*Configure GPIO pins : RA0_Pin RA1_Pin LED_BUILTIN_Pin RA2_Pin
+	 OUT_Pin */
+	GPIO_InitStruct.Pin = RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin
+			| OUT_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+	/* USER CODE BEGIN MX_GPIO_Init_2 */
+	/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -765,8 +755,6 @@ uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank) {
 }
 
 uint32_t CAN_TX(uint32_t ID, uint8_t data[8]) {
-
-	serialPrintln("TX start");
 
 	CAN_TxHeaderTypeDef txHeader = { 0 };
 
@@ -934,13 +922,19 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
 
+	osSemaphoreRelease(CAN_TX_SemaphoreHandle);
+
 }
 
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
 
+	osSemaphoreRelease(CAN_TX_SemaphoreHandle);
+
 }
 
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
+
+	osSemaphoreRelease(CAN_TX_SemaphoreHandle);
 
 }
 
@@ -953,14 +947,13 @@ void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
  * @retval None
  */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
-  /* USER CODE BEGIN 5 */
+void StartDefaultTask(void *argument) {
+	/* USER CODE BEGIN 5 */
 	/* Infinite loop */
 	for (;;) {
 		osDelay(1);
 	}
-  /* USER CODE END 5 */
+	/* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_scanKeysTask */
@@ -970,9 +963,8 @@ void StartDefaultTask(void *argument)
  * @retval None
  */
 /* USER CODE END Header_scanKeysTask */
-void scanKeysTask(void *argument)
-{
-  /* USER CODE BEGIN scanKeysTask */
+void scanKeysTask(void *argument) {
+	/* USER CODE BEGIN scanKeysTask */
 
 	const TickType_t xFrequency = 50 / portTICK_PERIOD_MS;
 	TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -990,10 +982,23 @@ void scanKeysTask(void *argument)
 
 		osMutexRelease(keysMutexHandle);
 
-		CAN_TX(0x123, TX_Message);
+//		CAN_TX(0x123, TX_Message);
+
+		CAN_MSG_t TX;
+		TX.ID = 0x123;
+		TX.Message[0] = 'A';
+		TX.Message[1] = 'L';
+		TX.Message[2] = 'I';
+		TX.Message[3] = 'B';
+		TX.Message[4] = 'E';
+		TX.Message[5] = 'S';
+		TX.Message[6] = 'T';
+		TX.Message[7] = '!';
+
+		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
 	}
-  /* USER CODE END scanKeysTask */
+	/* USER CODE END scanKeysTask */
 }
 
 /* USER CODE BEGIN Header_displayUpdateTask */
@@ -1003,9 +1008,8 @@ void scanKeysTask(void *argument)
  * @retval None
  */
 /* USER CODE END Header_displayUpdateTask */
-void displayUpdateTask(void *argument)
-{
-  /* USER CODE BEGIN displayUpdateTask */
+void displayUpdateTask(void *argument) {
+	/* USER CODE BEGIN displayUpdateTask */
 
 	const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
 	TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -1038,7 +1042,7 @@ void displayUpdateTask(void *argument)
 
 	}
 
-  /* USER CODE END displayUpdateTask */
+	/* USER CODE END displayUpdateTask */
 }
 
 /* USER CODE BEGIN Header_decode */
@@ -1048,9 +1052,8 @@ void displayUpdateTask(void *argument)
  * @retval None
  */
 /* USER CODE END Header_decode */
-void decode(void *argument)
-{
-  /* USER CODE BEGIN decode */
+void decode(void *argument) {
+	/* USER CODE BEGIN decode */
 	/* Infinite loop */
 	for (;;) {
 
@@ -1069,20 +1072,43 @@ void decode(void *argument)
 		u8g2_SendBuffer(&u8g2);
 
 	}
-  /* USER CODE END decode */
+	/* USER CODE END decode */
+}
+
+/* USER CODE BEGIN Header_CAN_Transmit */
+/**
+ * @brief Function implementing the CAN_TX_TaskName thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_CAN_Transmit */
+void CAN_Transmit(void *argument) {
+	/* USER CODE BEGIN CAN_Transmit */
+	/* Infinite loop */
+
+	CAN_MSG_t TX;
+
+	for (;;) {
+
+		osMessageQueueGet(msgOutQHandle, &TX, NULL, osWaitForever);
+		osSemaphoreAcquire(CAN_TX_SemaphoreHandle, osWaitForever);
+		CAN_TX(TX.ID, TX.Message);
+
+	}
+
+	/* USER CODE END CAN_Transmit */
 }
 
 /**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM16 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  /* USER CODE BEGIN Callback 0 */
+ * @brief  Period elapsed callback in non blocking mode
+ * @note   This function is called  when TIM16 interrupt took place, inside
+ * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+ * a global variable "uwTick" used as application time base.
+ * @param  htim : TIM handle
+ * @retval None
+ */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	/* USER CODE BEGIN Callback 0 */
 
 	if (htim == &htim6) {
 
@@ -1129,27 +1155,26 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	}
 
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM16) {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
+	/* USER CODE END Callback 0 */
+	if (htim->Instance == TIM16) {
+		HAL_IncTick();
+	}
+	/* USER CODE BEGIN Callback 1 */
 
-  /* USER CODE END Callback 1 */
+	/* USER CODE END Callback 1 */
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void) {
+	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
 	while (1) {
 	}
-  /* USER CODE END Error_Handler_Debug */
+	/* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
