@@ -11,11 +11,14 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 // display
 #include "cmsis_os2.h"
 #include "csrc/u8g2.h"
+#include "stm32l4xx_hal_dac.h"
+#include "stm32l4xx_it.h"
 
 /* USER CODE END Includes */
 
@@ -71,6 +74,13 @@ const osThreadAttr_t displayUpdate_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for synthesize */
+osThreadId_t synthesizeHandle;
+const osThreadAttr_t synthesize_attributes = {
+  .name = "synthesize",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh7,
+};
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
 const osMutexAttr_t keysMutex_attributes = {
@@ -109,6 +119,7 @@ static void MX_TIM2_Init(void);
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
 void displayUpdateTask(void *argument);
+void synthesizeTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -132,6 +143,49 @@ void rotationSteps(float *dreal, float *dimag);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#define SAMPLES 128
+
+uint32_t Wave_LUT[SAMPLES] = {
+    2048, 2149, 2250, 2350, 2450, 2549, 2646, 2742, 2837, 2929, 3020, 3108, 3193, 3275, 3355,
+    3431, 3504, 3574, 3639, 3701, 3759, 3812, 3861, 3906, 3946, 3982, 4013, 4039, 4060, 4076,
+    4087, 4094, 4095, 4091, 4082, 4069, 4050, 4026, 3998, 3965, 3927, 3884, 3837, 3786, 3730,
+    3671, 3607, 3539, 3468, 3394, 3316, 3235, 3151, 3064, 2975, 2883, 2790, 2695, 2598, 2500,
+    2400, 2300, 2199, 2098, 1997, 1896, 1795, 1695, 1595, 1497, 1400, 1305, 1212, 1120, 1031,
+    944, 860, 779, 701, 627, 556, 488, 424, 365, 309, 258, 211, 168, 130, 97,
+    69, 45, 26, 13, 4, 0, 1, 8, 19, 35, 56, 82, 113, 149, 189,
+    234, 283, 336, 394, 456, 521, 591, 664, 740, 820, 902, 987, 1075, 1166, 1258,
+    1353, 1449, 1546, 1645, 1745, 1845, 1946, 2047
+};
+
+
+uint32_t output_LUT[SAMPLES] = {
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+    2048,2048,2048,2048,2048,2048,2048,2048, 
+};
+
+
+
+
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
+    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    /*
+    if (localKeys == 0x0FFF){
+        __HAL_RCC_DMA1_CLK_ENABLE
+    }*/
+}
+
+
+void HAL_DAC_ConvCpltCallbackCh2(DAC_HandleTypeDef *hdac) {
+}
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -142,7 +196,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-	rotationSteps(dreal, dimag);
+        rotationSteps(dreal, dimag);
 
   /* USER CODE END 1 */
 
@@ -175,24 +229,27 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-	HAL_TIM_Base_Start(&htim7);
+    HAL_TIM_Base_Start(&htim2);
+    HAL_TIM_Base_Start(&htim7);
 
-	HAL_TIM_Base_Start_IT(&htim6);
+    HAL_TIM_Base_Start_IT(&htim6);
 
-	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
-	setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
-	delayMicro(2);
-	setOutMuxBit(DRST_BIT, GPIO_PIN_SET);
-	u8g2_Setup_ssd1305_i2c_128x32_noname_f(&u8g2, U8G2_R0, u8x8_byte_i2c,
-			u8x8_gpio_and_delay);
-	u8g2_InitDisplay(&u8g2);
-	u8g2_ClearDisplay(&u8g2);
-	u8g2_SetPowerSave(&u8g2, 0);
-	setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_LUT, 128, DAC_ALIGN_12B_R);
 
-        serialPrintln("charIOT-Key-C");
+    HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
+
+    setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
+    delayMicro(2);
+    setOutMuxBit(DRST_BIT, GPIO_PIN_SET);
+    u8g2_Setup_ssd1305_i2c_128x32_noname_f(&u8g2, U8G2_R0, u8x8_byte_i2c,
+                u8x8_gpio_and_delay);
+    u8g2_InitDisplay(&u8g2);
+    u8g2_ClearDisplay(&u8g2);
+    u8g2_SetPowerSave(&u8g2, 0);
+    setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
+
+    serialPrintln("charIOT-Key-C");
 
   /* USER CODE END 2 */
 
@@ -203,20 +260,20 @@ int main(void)
   keysMutexHandle = osMutexNew(&keysMutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
-	/* add mutexes, ... */
-	osMutexRelease(keysMutexHandle);
+        /* add mutexes, ... */
+        osMutexRelease(keysMutexHandle);
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-	/* add semaphores, ... */
+        /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-	/* start timers, add new ones, ... */
+        /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-	/* add queues, ... */
+        /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -229,12 +286,15 @@ int main(void)
   /* creation of displayUpdate */
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
 
+  /* creation of synthesize */
+  synthesizeHandle = osThreadNew(synthesizeTask, NULL, &synthesize_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
-	/* add threads, ... */
+        /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-	/* add events, ... */
+        /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -520,7 +580,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 624;
+  htim2.Init.Period = 2383;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -923,13 +983,9 @@ void displayUpdateTask(void *argument)
         u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
 
         if (localKeys == 0x0FFF) {
-
                 u8g2_DrawStr(&u8g2, 2, 20, "- ^_^ -");
-
         } else {
-
                 u8g2_DrawStr(&u8g2, 2, 20, "- ^0^ -");
-
         }
 
         u8g2_SendBuffer(&u8g2);
@@ -937,6 +993,74 @@ void displayUpdateTask(void *argument)
     }
 
   /* USER CODE END displayUpdateTask */
+}
+
+/* USER CODE BEGIN Header_synthesizeTask */
+/**
+* @brief Function implementing the synthesize thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_synthesizeTask */
+void synthesizeTask(void *argument)
+{
+  /* USER CODE BEGIN synthesizeTask */
+  /* Infinite loop */
+
+
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+
+    for(;;)
+    {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+
+        if (localKeys == 0x0FFF) {
+            for(int i = 0; i < SAMPLES; i++) {
+                output_LUT[i] = 2048;
+            }
+        } else {
+            // Key input observed
+
+            // Middle C
+
+            uint16_t base_freq = 262;
+
+            if (~localKeys & (1 << 0)){
+                for(int i = 0; i < SAMPLES; i++) {
+                    output_LUT[i] = Wave_LUT[i];
+                }
+            } else if (~localKeys & (1 << 1)) {
+
+                uint16_t c_sharp_freq = 277;
+                float sample_speed = (float)c_sharp_freq / (float)base_freq;
+
+                float sample_index = 0;
+                for(int i = 0; i < SAMPLES; i++) {
+                    sample_index += sample_speed;
+                    output_LUT[i] = Wave_LUT[(uint16_t)sample_index % SAMPLES];
+                }
+            } else if (~localKeys & (1 << 9)) {
+
+                uint16_t c_sharp_freq = 440;
+                float sample_speed = (float)c_sharp_freq / (float)base_freq;
+
+                float sample_index = 0;
+                for(int i = 0; i < SAMPLES; i++) {
+                    sample_index += sample_speed;
+                    output_LUT[i] = Wave_LUT[(uint16_t)sample_index % SAMPLES];
+                }
+            }
+
+            
+
+        }
+
+
+    }
+  /* USER CODE END synthesizeTask */
 }
 
 /**
@@ -950,6 +1074,7 @@ void displayUpdateTask(void *argument)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
+    /*
 
 	if (htim == &htim6) {
 
@@ -994,6 +1119,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				GPIO_PIN_RESET);
 
 	}
+        */
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM16) {
