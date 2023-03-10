@@ -1098,14 +1098,10 @@ void scanKeysTask(void *argument)
 
 		CAN_MSG_t TX;
 		TX.ID = IDout;
-		TX.Message[0] = 'A';
-		TX.Message[1] = 'l';
-		TX.Message[2] = 'i';
-		TX.Message[3] = 'B';
-		TX.Message[4] = 'e';
-		TX.Message[5] = 's';
-		TX.Message[6] = 't';
-		TX.Message[7] = '!';
+		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
+		for (int i = 0; i < sizeof(TX.Message); i++){
+			TX.Message[i] = msg[i];
+		}
 
 		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
@@ -1150,7 +1146,7 @@ void displayUpdateTask(void *argument)
 		u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
 
 //		PRINTING VOLUME
-		u8g2_DrawStr(&u8g2, 105, 30, "Vol:");
+		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  1, "Vol:");
 		char volume_s[16];
 		sprintf(volume_s, "%x", volume);
 		u8g2_DrawStr(&u8g2, 118, 30, volume_s);
@@ -1188,16 +1184,6 @@ void decode(void *argument)
 	for (;;) {
 
 		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
-
-//		char hexID[3];
-//
-//		sprintf(hexID, "%lX", RX.ID);
-
-//		u8g2_ClearBuffer(&u8g2);
-//		u8g2_SetFont(&u8g2, u8g2_font_6x12_tf);
-//		u8g2_DrawStr(&u8g2, 2, 10, hexID);
-//		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX.Message);
-//		u8g2_SendBuffer(&u8g2);
 
 	}
   /* USER CODE END decode */

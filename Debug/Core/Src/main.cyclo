@@ -30,9 +30,9 @@ main.c:1024:6:HAL_CAN_TxMailbox0CompleteCallback	1
 main.c:1030:6:HAL_CAN_TxMailbox1CompleteCallback	1
 main.c:1036:6:HAL_CAN_TxMailbox2CompleteCallback	1
 main.c:1051:6:StartDefaultTask	1
-main.c:1068:6:scanKeysTask	1
-main.c:1123:6:displayUpdateTask	2
-main.c:1184:6:decode	1
-main.c:1213:6:CAN_Transmit	1
-main.c:1239:6:HAL_TIM_PeriodElapsedCallback	5
-main.c:1300:6:Error_Handler	1
+main.c:1068:6:scanKeysTask	2
+main.c:1119:6:displayUpdateTask	2
+main.c:1180:6:decode	1
+main.c:1199:6:CAN_Transmit	1
+main.c:1225:6:HAL_TIM_PeriodElapsedCallback	5
+main.c:1286:6:Error_Handler	1
