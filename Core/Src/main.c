@@ -143,9 +143,12 @@ void rotationSteps(float *dreal, float *dimag);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define SAMPLES 128
 
-uint32_t Wave_LUT[SAMPLES] = {
+
+#define PI 3.14159265359
+
+/*
+uint16_t Wave_LUT[SAMPLES] = {
     2048, 2149, 2250, 2350, 2450, 2549, 2646, 2742, 2837, 2929, 3020, 3108, 3193, 3275, 3355,
     3431, 3504, 3574, 3639, 3701, 3759, 3812, 3861, 3906, 3946, 3982, 4013, 4039, 4060, 4076,
     4087, 4094, 4095, 4091, 4082, 4069, 4050, 4026, 3998, 3965, 3927, 3884, 3837, 3786, 3730,
@@ -155,33 +158,121 @@ uint32_t Wave_LUT[SAMPLES] = {
     69, 45, 26, 13, 4, 0, 1, 8, 19, 35, 56, 82, 113, 149, 189,
     234, 283, 336, 394, 456, 521, 591, 664, 740, 820, 902, 987, 1075, 1166, 1258,
     1353, 1449, 1546, 1645, 1745, 1845, 1946, 2047
+};*/
+
+
+
+#define ROOT_12_OF_2 1.05946
+
+#define C_samples 336
+#define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
+#define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
+#define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
+#define E_samples       (uint32_t)(D_sharp_samples / ROOT_12_OF_2)
+#define F_samples       (uint32_t)(E_samples /       ROOT_12_OF_2)
+#define F_sharp_samples (uint32_t)(F_samples /       ROOT_12_OF_2)
+#define G_samples       (uint32_t)(F_sharp_samples / ROOT_12_OF_2)
+#define G_sharp_samples (uint32_t)(G_samples /       ROOT_12_OF_2)
+#define A_samples       (uint32_t)(G_sharp_samples / ROOT_12_OF_2)
+#define A_sharp_samples (uint32_t)(A_samples /       ROOT_12_OF_2)
+#define B_samples       (uint32_t)(A_sharp_samples / ROOT_12_OF_2)
+
+
+#define OUTPUT_SAMPLES C_sharp_samples 
+uint16_t output_LUT[OUTPUT_SAMPLES];
+
+
+uint32_t sample_counts [12] = {
+    C_samples,
+    C_sharp_samples,
+    D_samples,
+    D_sharp_samples,
+    E_samples,
+    F_samples,
+    F_sharp_samples,
+    G_samples,
+    G_sharp_samples,
+    A_samples,
+    A_sharp_samples,
+    B_samples
 };
 
+uint16_t C_LUT          [C_samples];
+uint16_t C_sharp_LUT    [C_sharp_samples];
+uint16_t D_LUT          [D_samples];
+uint16_t D_sharp_LUT    [D_sharp_samples];
+uint16_t E_LUT          [E_samples];
+uint16_t F_LUT          [F_samples];
+uint16_t F_sharp_LUT    [F_sharp_samples];
+uint16_t G_LUT          [G_samples];
+uint16_t G_sharp_LUT    [G_sharp_samples];
+uint16_t A_LUT          [A_samples];
+uint16_t A_sharp_LUT    [A_sharp_samples];
+uint16_t B_LUT          [B_samples];
 
-uint32_t output_LUT[SAMPLES] = {
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
-    2048,2048,2048,2048,2048,2048,2048,2048, 
+uint16_t* lookup_tables [12] = {
+    C_LUT,
+    C_sharp_LUT,
+    D_LUT,
+    D_sharp_LUT,
+    E_LUT,
+    F_LUT,
+    F_sharp_LUT,
+    G_LUT,
+    G_sharp_LUT,
+    A_LUT,
+    A_sharp_LUT,
+    B_LUT,
 };
 
+uint16_t lookup_indeces [12];
 
 
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
-    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
     /*
     if (localKeys == 0x0FFF){
         __HAL_RCC_DMA1_CLK_ENABLE
     }*/
+
+    //output_LUT[i] /= 12.0;
+
+
+    //char buf [20];
+    //sprintf(buf, "%i %i", output_LUT[i], lookup_tables[1][lookup_indeces[1]]);
+    //serialPrintln(buf);
+    //
+
+    serialPrintln("cmpl");
+
+    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    
+    for (int i = OUTPUT_SAMPLES/2; i < OUTPUT_SAMPLES; i++) {
+
+        for (int t = 1; t < 2; t++){
+            lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
+
+            bool key_pressed = ~localKeys & ( 1 << t);
+            output_LUT[i] = key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
+        }
+    }
 }
 
 
 void HAL_DAC_ConvCpltCallbackCh2(DAC_HandleTypeDef *hdac) {
+
+    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    
+    for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
+
+        for (int t = 1; t < 2; t++){
+            lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
+
+            bool key_pressed = ~localKeys & ( 1 << t);
+            output_LUT[i] = key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
+        }
+    }
+
 }
 
 
@@ -235,8 +326,7 @@ int main(void)
     HAL_TIM_Base_Start_IT(&htim6);
 
 
-    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_LUT, 128, DAC_ALIGN_12B_R);
-
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
     HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
     setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
@@ -250,6 +340,32 @@ int main(void)
     setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
 
     serialPrintln("charIOT-Key-C");
+
+
+    char buf [20];
+    sprintf(buf, "t: %u", B_samples);
+    serialPrintln(buf);
+
+    for (int t = 0; t < 12; t++) {
+
+        uint32_t samples =  sample_counts[t];
+
+        sprintf(buf, "\n\n Lut: %i------", t);
+        serialPrintln(buf);
+
+
+        for (int i = 0; i < samples; i++) {
+            lookup_tables[t][i] = 2048 + 2048 * sin(2.0 * PI * (float)i / (float) samples);
+            sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+            serialPrintln(buf);
+        }
+
+        
+
+    
+    }
+
+
 
   /* USER CODE END 2 */
 
@@ -580,7 +696,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 2383;
+  htim2.Init.Period = 624;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -1017,46 +1133,6 @@ void synthesizeTask(void *argument)
 
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
 
-        if (localKeys == 0x0FFF) {
-            for(int i = 0; i < SAMPLES; i++) {
-                output_LUT[i] = 2048;
-            }
-        } else {
-            // Key input observed
-
-            // Middle C
-
-            uint16_t base_freq = 262;
-
-            if (~localKeys & (1 << 0)){
-                for(int i = 0; i < SAMPLES; i++) {
-                    output_LUT[i] = Wave_LUT[i];
-                }
-            } else if (~localKeys & (1 << 1)) {
-
-                uint16_t c_sharp_freq = 277;
-                float sample_speed = (float)c_sharp_freq / (float)base_freq;
-
-                float sample_index = 0;
-                for(int i = 0; i < SAMPLES; i++) {
-                    sample_index += sample_speed;
-                    output_LUT[i] = Wave_LUT[(uint16_t)sample_index % SAMPLES];
-                }
-            } else if (~localKeys & (1 << 9)) {
-
-                uint16_t c_sharp_freq = 440;
-                float sample_speed = (float)c_sharp_freq / (float)base_freq;
-
-                float sample_index = 0;
-                for(int i = 0; i < SAMPLES; i++) {
-                    sample_index += sample_speed;
-                    output_LUT[i] = Wave_LUT[(uint16_t)sample_index % SAMPLES];
-                }
-            }
-
-            
-
-        }
 
 
     }
