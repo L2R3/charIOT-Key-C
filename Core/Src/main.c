@@ -103,6 +103,11 @@ osMutexId_t keysMutexHandle;
 const osMutexAttr_t keysMutex_attributes = {
   .name = "keysMutex"
 };
+/* Definitions for knobsMutex */
+osMutexId_t knobsMutexHandle;
+const osMutexAttr_t knobsMutex_attributes = {
+  .name = "knobsMutex"
+};
 /* Definitions for CAN_TX_Semaphore */
 osSemaphoreId_t CAN_TX_SemaphoreHandle;
 const osSemaphoreAttr_t CAN_TX_Semaphore_attributes = {
@@ -116,6 +121,7 @@ const int HKOW_BIT = 5;
 const int HKOE_BIT = 6;
 
 u8g2_t u8g2;
+CAN_MSG_t RX;
 
 const float fs = 22000;
 const float fA = 440;
@@ -123,6 +129,10 @@ float dreal[12];
 float dimag[12];
 
 volatile uint16_t keys = 0x0FFF;
+volatile uint16_t prev_keys = 0x0FFF;
+volatile uint16_t knobs = 0xFF;
+volatile uint16_t prev_knobs = 0xFF;
+uint16_t volume = 4;
 
 //uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
 
@@ -166,6 +176,9 @@ uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
 void setRow(uint8_t rowIdx);
 uint8_t readCols();
 uint16_t readKeys();
+uint16_t readKnobs();
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume);
+void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index );
 
 void rotationSteps(float *dreal, float *dimag);
 
@@ -239,31 +252,6 @@ int main(void)
 
 	serialPrintln("charIOT-Key-C");
 
-//	while (1) {
-//
-//		CAN_TX(0x123, TX_Message);
-//
-//		uint32_t ID = 0x111;
-//		uint8_t RX_Message[8] = { 0 };
-//		char IDtext[2];
-//
-//		while (CAN_CheckRXLevel()) {
-//			CAN_RX(&ID, RX_Message);
-//		}
-//
-//		sprintf(IDtext, "%lX", ID);
-//
-//		serialPrintln((char*) RX_Message);
-//
-//		u8g2_ClearBuffer(&u8g2);
-//		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-//		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX_Message);
-//		u8g2_SendBuffer(&u8g2);
-//
-//		HAL_Delay(1000);
-//
-//	}
-
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -272,9 +260,13 @@ int main(void)
   /* creation of keysMutex */
   keysMutexHandle = osMutexNew(&keysMutex_attributes);
 
+  /* creation of knobsMutex */
+  knobsMutexHandle = osMutexNew(&knobsMutex_attributes);
+
   /* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
 	osMutexRelease(keysMutexHandle);
+	osMutexRelease(knobsMutexHandle);
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -929,6 +921,84 @@ uint16_t readKeys() {
 
 }
 
+uint16_t readKnobs() {
+
+	uint16_t knobsRead = 0;
+
+	for (int i = 3; i <= 4; i++) {
+
+		setRow(i);
+		delayMicro(5);
+		knobsRead |= readCols() << (4 * (i-3));
+
+	}
+
+	return knobsRead;
+
+}
+
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation){
+	int16_t rotation = 0;
+	int current_knob = knob_state;
+	int prev_knob = previousKnobState;
+	int8_t top_limit = 8;
+	int8_t bottom_limit = 0;
+
+	// upper and bottom levels for volume
+	if ((((prev_knob == 0b11) && (current_knob == 0b10)) ||
+	  ((prev_knob == 0b00) && (current_knob == 0b01))) &&
+		knobRotation < top_limit
+	){
+	rotation ++;
+	} else
+	if ((((prev_knob == 0b01) && (current_knob == 0b00)) ||
+	   ((prev_knob == 0b10) && (current_knob == 0b11))) &&
+		 knobRotation > bottom_limit
+	) {
+	rotation --;
+	}
+
+	return rotation;
+}
+
+void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index ) {
+	uint8_t shift_row = (knob_index >= 2) ? 0 : 4;
+	uint8_t row = 0xF;
+	uint8_t knob_on_row = 1 - knob_index % 2;
+
+	uint8_t rowKnobStates 	  = (localKnobs 	 >> shift_row) & row;
+	uint8_t rowPrevKnobStates = (prevKnobs >> shift_row) & row;
+
+//	char s[32];
+//	sprintf(s, "rowKnobStates:%x", rowKnobStates);
+//	serialPrintln(s);
+
+	uint8_t knobState		  = (rowKnobStates 	   >> knob_on_row*2) & 0b11;
+	uint8_t previousKnobState = (rowPrevKnobStates >> knob_on_row*2) & 0b11;
+
+//	sprintf(s, "3 knobState:         %x", knobState);
+//	serialPrintln(s);
+//	sprintf(s, "3 previousKnobState: %x", previousKnobState);
+//	serialPrintln(s);
+
+	int16_t change_volume = changeKnobState(knobState, previousKnobState, volume);
+	volume = volume + change_volume;
+//	sprintf(s, "volume: %d", volume);
+//	serialPrintln(s);
+
+//	UPDATE GLOBAL VARIABLES
+	osMutexAcquire(knobsMutexHandle, osWaitForever);
+	__atomic_store_n(&knobs, localKnobs, __ATOMIC_RELAXED);
+	osMutexRelease(knobsMutexHandle);
+
+	if (previousKnobState != knobState) {
+		osMutexAcquire(knobsMutexHandle, osWaitForever);
+		__atomic_store_n(&prev_knobs, localKnobs, __ATOMIC_RELAXED);
+		osMutexRelease(knobsMutexHandle);
+	}
+
+}
+
 void rotationSteps(float *dreal, float *dimag) {
 
 	float phi;
@@ -1008,22 +1078,33 @@ void scanKeysTask(void *argument)
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
 		uint16_t localKeys = readKeys();
+		uint16_t localKnobs = readKnobs();
+
+//		char key_s[16];
+//		sprintf(key_s, "%x", localKeys);
+//		char knobs_s[16];
+//		sprintf(knobs_s, "%x", localKnobs);
+//
+//		serialPrint("keys: ");
+//		serialPrintln(key_s);
+//		serialPrint("knobs: ");
+//		serialPrintln(knobs_s);
+
+		scanKnob(localKnobs, (uint16_t) prev_knobs, 3);
 
 		osMutexAcquire(keysMutexHandle, osWaitForever);
-
 		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
-
 		osMutexRelease(keysMutexHandle);
 
 		CAN_MSG_t TX;
 		TX.ID = IDout;
 		TX.Message[0] = 'A';
-		TX.Message[1] = 'L';
-		TX.Message[2] = 'I';
+		TX.Message[1] = 'l';
+		TX.Message[2] = 'i';
 		TX.Message[3] = 'B';
-		TX.Message[4] = 'E';
-		TX.Message[5] = 'S';
-		TX.Message[6] = 'T';
+		TX.Message[4] = 'e';
+		TX.Message[5] = 's';
+		TX.Message[6] = 't';
 		TX.Message[7] = '!';
 
 		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
@@ -1051,26 +1132,42 @@ void displayUpdateTask(void *argument)
 
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-//		osMutexAcquire(keysMutexHandle, osWaitForever);
-//
-//		uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-//
-//		osMutexRelease(keysMutexHandle);
-//
-//		u8g2_ClearBuffer(&u8g2);
-//		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-//
-//		if (localKeys == 0x0FFF) {
-//
-//			u8g2_DrawStr(&u8g2, 2, 20, "- ^_^ -");
-//
-//		} else {
-//
-//			u8g2_DrawStr(&u8g2, 2, 20, "- ^0^ -");
-//
-//		}
-//
-//		u8g2_SendBuffer(&u8g2);
+		osMutexAcquire(keysMutexHandle, osWaitForever);
+
+		uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+
+		osMutexRelease(keysMutexHandle);
+		osMutexRelease(knobsMutexHandle);
+
+		u8g2_ClearBuffer(&u8g2);
+		u8g2_SetFont(&u8g2, u8g2_font_new3x9pixelfont_tr);
+
+//		PRINTING THE CAN RECEIVED MESSAGE and ID
+		char hexID[3];
+		sprintf(hexID, "%lX", RX.ID);
+		u8g2_DrawStr(&u8g2, 2, 7, "Rid:");
+		u8g2_DrawStr(&u8g2, 15, 7, hexID);
+		u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
+
+//		PRINTING VOLUME
+		u8g2_DrawStr(&u8g2, 105, 30, "Vol:");
+		char volume_s[16];
+		sprintf(volume_s, "%x", volume);
+		u8g2_DrawStr(&u8g2, 118, 30, volume_s);
+
+//		PRINTING PET
+		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+		if (localKeys == 0x0FFF) {
+
+			u8g2_DrawStr(&u8g2, 2, 30, "- ^_^ -");
+
+		} else {
+
+			u8g2_DrawStr(&u8g2, 2, 30, "- ^0^ -");
+
+		}
+
+		u8g2_SendBuffer(&u8g2);
 
 	}
 
@@ -1090,19 +1187,17 @@ void decode(void *argument)
 	/* Infinite loop */
 	for (;;) {
 
-		CAN_MSG_t RX;
-
 		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
-		char hexID[3];
+//		char hexID[3];
+//
+//		sprintf(hexID, "%lX", RX.ID);
 
-		sprintf(hexID, "%lX", RX.ID);
-
-		u8g2_ClearBuffer(&u8g2);
-		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-		u8g2_DrawStr(&u8g2, 2, 10, hexID);
-		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX.Message);
-		u8g2_SendBuffer(&u8g2);
+//		u8g2_ClearBuffer(&u8g2);
+//		u8g2_SetFont(&u8g2, u8g2_font_6x12_tf);
+//		u8g2_DrawStr(&u8g2, 2, 10, hexID);
+//		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX.Message);
+//		u8g2_SendBuffer(&u8g2);
 
 	}
   /* USER CODE END decode */
@@ -1179,7 +1274,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		}
 
-		int16_t Vout = (int16_t) 1024 * Vadd / 12.0;
+		int16_t Vout = (int16_t) 512 * Vadd / 12.0 * volume;
 
 		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, Vout + 2048);
 		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_2, DAC_ALIGN_12B_R, Vout + 2048);
