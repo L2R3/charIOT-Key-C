@@ -9,6 +9,7 @@
 		<item key="SmartImportRootWizardPage.STORE_NESTED_PROJECTS" value="true"/>
 		<item key="SmartImportRootWizardPage.STORE_CONFIGURE_NATURES" value="true"/>
 		<list key="org.eclipse.ui.internal.wizards.datatransfer.SmartImportRootWizardPage.knownSources">
+			<item value="/home/ali/STM32CubeIDE/charIOT-Key-C"/>
 			<item value="C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems"/>
 			<item value="C:\Users\weizh\Documents\EEE_Year_3\Embedded Systems\charIOT-Key-C"/>
 		</list>
