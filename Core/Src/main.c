@@ -126,6 +126,7 @@ void synthesizeTask(void *argument);
 void serialPrint(char val[]);
 void serialPrintln(char val[]);
 void delayMicro(uint16_t us);
+void synthesize_waves(int index);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value);
 uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
@@ -178,7 +179,7 @@ uint16_t Wave_LUT[SAMPLES] = {
 #define B_samples       (uint32_t)(A_sharp_samples / ROOT_12_OF_2)
 
 
-#define OUTPUT_SAMPLES C_sharp_samples 
+#define OUTPUT_SAMPLES C_samples 
 uint16_t output_LUT[OUTPUT_SAMPLES];
 
 
@@ -227,7 +228,31 @@ uint16_t* lookup_tables [12] = {
 
 uint16_t lookup_indeces [12];
 
+uint16_t DMAkeys;
 
+inline void synthesize_waves(int index){
+
+    uint32_t out = 0;
+
+    for (int t = 0; t < 9; t++){
+        lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
+        bool key_pressed = ~DMAkeys & ( 1 << t);
+        out += key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
+    }
+
+    output_LUT[index] = out >> 3;
+}
+
+
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
+
+    //serialPrintln("half");
+    DMAkeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    
+    for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
+        synthesize_waves(i);
+    }
+}
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
     /*
@@ -243,36 +268,11 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
     //serialPrintln(buf);
     //
 
-    serialPrintln("cmpl");
-
-    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    //serialPrintln("cmpl");
     
     for (int i = OUTPUT_SAMPLES/2; i < OUTPUT_SAMPLES; i++) {
-
-        for (int t = 1; t < 2; t++){
-            lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
-
-            bool key_pressed = ~localKeys & ( 1 << t);
-            output_LUT[i] = key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
-        }
+        synthesize_waves(i);
     }
-}
-
-
-void HAL_DAC_ConvCpltCallbackCh2(DAC_HandleTypeDef *hdac) {
-
-    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-    
-    for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
-
-        for (int t = 1; t < 2; t++){
-            lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
-
-            bool key_pressed = ~localKeys & ( 1 << t);
-            output_LUT[i] = key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
-        }
-    }
-
 }
 
 
@@ -342,27 +342,21 @@ int main(void)
     serialPrintln("charIOT-Key-C");
 
 
+    //Generate wave tables
     char buf [20];
-    sprintf(buf, "t: %u", B_samples);
-    serialPrintln(buf);
-
     for (int t = 0; t < 12; t++) {
 
         uint32_t samples =  sample_counts[t];
 
         sprintf(buf, "\n\n Lut: %i------", t);
-        serialPrintln(buf);
+        //serialPrintln(buf);
 
 
         for (int i = 0; i < samples; i++) {
             lookup_tables[t][i] = 2048 + 2048 * sin(2.0 * PI * (float)i / (float) samples);
             sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
-            serialPrintln(buf);
+            //serialPrintln(buf);
         }
-
-        
-
-    
     }
 
 
@@ -403,7 +397,7 @@ int main(void)
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
 
   /* creation of synthesize */
-  synthesizeHandle = osThreadNew(synthesizeTask, NULL, &synthesize_attributes);
+  //synthesizeHandle = osThreadNew(synthesizeTask, NULL, &synthesize_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
         /* add threads, ... */
@@ -696,7 +690,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 624;
+  htim2.Init.Period = 700;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -1125,13 +1119,20 @@ void synthesizeTask(void *argument)
 
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+    const TickType_t xFrequency = 10000 / portTICK_PERIOD_MS;
 
     for(;;)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+
+        for(int i = 0; i < OUTPUT_SAMPLES; i++){
+            char buf [20];
+            sprintf(buf, "%i ", output_LUT[i]);
+            serialPrint(buf);
+        }
+        serialPrintln("\n\n");
 
 
 
