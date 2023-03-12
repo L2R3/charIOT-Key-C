@@ -66,7 +66,7 @@ main-build: charIOT-Key-C.elf secondary-outputs
 
 # Tool invocations
 charIOT-Key-C.elf charIOT-Key-C.map: $(OBJS) $(USER_OBJS) /home/jlsand/Embedded/charIOT-Key-C/STM32L432KCUX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "charIOT-Key-C.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/jlsand/Embedded/charIOT-Key-C/STM32L432KCUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="charIOT-Key-C.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "charIOT-Key-C.elf" @"objects.list" $(USER_OBJS) $(LIBS) -O3 -mcpu=cortex-m4 -T"/home/jlsand/Embedded/charIOT-Key-C/STM32L432KCUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="charIOT-Key-C.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

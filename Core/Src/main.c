@@ -162,113 +162,69 @@ uint16_t Wave_LUT[SAMPLES] = {
 };*/
 
 
-
 #define ROOT_12_OF_2 1.05946
 
-#define C_samples 336
-#define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
-#define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
-#define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
-#define E_samples       (uint32_t)(D_sharp_samples / ROOT_12_OF_2)
-#define F_samples       (uint32_t)(E_samples /       ROOT_12_OF_2)
-#define F_sharp_samples (uint32_t)(F_samples /       ROOT_12_OF_2)
-#define G_samples       (uint32_t)(F_sharp_samples / ROOT_12_OF_2)
-#define G_sharp_samples (uint32_t)(G_samples /       ROOT_12_OF_2)
-#define A_samples       (uint32_t)(G_sharp_samples / ROOT_12_OF_2)
-#define A_sharp_samples (uint32_t)(A_samples /       ROOT_12_OF_2)
-#define B_samples       (uint32_t)(A_sharp_samples / ROOT_12_OF_2)
+#define C_increment 1.0
+#define C_sharp_increment (C_increment *       ROOT_12_OF_2)
+#define D_increment       (C_sharp_increment * ROOT_12_OF_2)
+#define D_sharp_increment (D_increment *       ROOT_12_OF_2)
+#define E_increment       (D_sharp_increment * ROOT_12_OF_2)
+#define F_increment       (E_increment *       ROOT_12_OF_2)
+#define F_sharp_increment (F_increment *       ROOT_12_OF_2)
+#define G_increment       (F_sharp_increment * ROOT_12_OF_2)
+#define G_sharp_increment (G_increment *       ROOT_12_OF_2)
+#define A_increment       (G_sharp_increment * ROOT_12_OF_2)
+#define A_sharp_increment (A_increment *       ROOT_12_OF_2)
+#define B_increment       (A_sharp_increment * ROOT_12_OF_2)
 
-
-#define OUTPUT_SAMPLES C_samples 
-uint16_t output_LUT[OUTPUT_SAMPLES];
-
-
-uint32_t sample_counts [12] = {
-    C_samples,
-    C_sharp_samples,
-    D_samples,
-    D_sharp_samples,
-    E_samples,
-    F_samples,
-    F_sharp_samples,
-    G_samples,
-    G_sharp_samples,
-    A_samples,
-    A_sharp_samples,
-    B_samples
+const uint16_t freq_increments [12] = {
+    17, 
+    18,
+    19,
+    20,
+    21,
+    22,
+    24,
+    25,
+    26,
+    28,
+    30,
+    32
 };
 
-uint16_t C_LUT          [C_samples];
-uint16_t C_sharp_LUT    [C_sharp_samples];
-uint16_t D_LUT          [D_samples];
-uint16_t D_sharp_LUT    [D_sharp_samples];
-uint16_t E_LUT          [E_samples];
-uint16_t F_LUT          [F_samples];
-uint16_t F_sharp_LUT    [F_sharp_samples];
-uint16_t G_LUT          [G_samples];
-uint16_t G_sharp_LUT    [G_sharp_samples];
-uint16_t A_LUT          [A_samples];
-uint16_t A_sharp_LUT    [A_sharp_samples];
-uint16_t B_LUT          [B_samples];
+#define WAVETABLE_SAMPLES 1024 
+uint16_t wavetable [WAVETABLE_SAMPLES];
+uint16_t freq_counts [12];
 
-uint16_t* lookup_tables [12] = {
-    C_LUT,
-    C_sharp_LUT,
-    D_LUT,
-    D_sharp_LUT,
-    E_LUT,
-    F_LUT,
-    F_sharp_LUT,
-    G_LUT,
-    G_sharp_LUT,
-    A_LUT,
-    A_sharp_LUT,
-    B_LUT,
-};
-
-uint16_t lookup_indeces [12];
-
-uint16_t DMAkeys;
+#define OUTPUT_SAMPLES 64 
+uint16_t output_wave [OUTPUT_SAMPLES];
+bool DMAkeysPressed [12];
 
 inline void synthesize_waves(int index){
+    uint16_t DMAkeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    for (int k = 0; k < 12; k++) {
+        DMAkeysPressed[k] = ~DMAkeys & (1 << k);
+    }
 
     uint32_t out = 0;
 
-    for (int t = 0; t < 9; t++){
-        lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
-        bool key_pressed = ~DMAkeys & ( 1 << t);
-        out += key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
+    for (int f = 0; f < 3; f++){
+        freq_counts[f] += freq_increments[f];
+        
+        out += DMAkeysPressed[f] ? wavetable[freq_counts[f] & 0x03FF] : 2048;
     }
 
-    output_LUT[index] = out >> 3;
+     output_wave[index] = out >> 4;
 }
 
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
-
-    //serialPrintln("half");
-    DMAkeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-    
     for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
         synthesize_waves(i);
     }
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
-    /*
-    if (localKeys == 0x0FFF){
-        __HAL_RCC_DMA1_CLK_ENABLE
-    }*/
-
-    //output_LUT[i] /= 12.0;
-
-
-    //char buf [20];
-    //sprintf(buf, "%i %i", output_LUT[i], lookup_tables[1][lookup_indeces[1]]);
-    //serialPrintln(buf);
-    //
-
-    //serialPrintln("cmpl");
     
     for (int i = OUTPUT_SAMPLES/2; i < OUTPUT_SAMPLES; i++) {
         synthesize_waves(i);
@@ -320,13 +276,39 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+
+    serialPrintln("charIOT-Key-C");
+    char buf [20];
+
+
+    /*
+    float increment = 17.0;
+    for(int i = 0; i < 12; i++){
+        freq_increments[i] = increment;
+
+        increment *= 1.05946;
+
+        sprintf(buf, "%i ", freq_increments[i]);
+        serialPrintln(buf);
+    }*/
+
+
+    //Generate wave tables
+    for (int i = 0; i < WAVETABLE_SAMPLES; i++) {
+        wavetable[i] = 2048 + 2048 * sin(2.0 * PI * (float)i / (float) WAVETABLE_SAMPLES);
+        //sprintf(buf, "%i %i ", i, wavetable[i]);
+        //serialPrintln(buf);
+    }
+
+    serialPrintln("Wavetable gen done");
+
     HAL_TIM_Base_Start(&htim2);
     HAL_TIM_Base_Start(&htim7);
 
     HAL_TIM_Base_Start_IT(&htim6);
 
 
-    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)output_wave, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
     HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
     setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
@@ -339,25 +321,6 @@ int main(void)
     u8g2_SetPowerSave(&u8g2, 0);
     setOutMuxBit(DEN_BIT, GPIO_PIN_SET);
 
-    serialPrintln("charIOT-Key-C");
-
-
-    //Generate wave tables
-    char buf [20];
-    for (int t = 0; t < 12; t++) {
-
-        uint32_t samples =  sample_counts[t];
-
-        sprintf(buf, "\n\n Lut: %i------", t);
-        //serialPrintln(buf);
-
-
-        for (int i = 0; i < samples; i++) {
-            lookup_tables[t][i] = 2048 + 2048 * sin(2.0 * PI * (float)i / (float) samples);
-            sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
-            //serialPrintln(buf);
-        }
-    }
 
 
 
@@ -690,7 +653,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 700;
+  htim2.Init.Period = 2300;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -1129,7 +1092,7 @@ void synthesizeTask(void *argument)
 
         for(int i = 0; i < OUTPUT_SAMPLES; i++){
             char buf [20];
-            sprintf(buf, "%i ", output_LUT[i]);
+            sprintf(buf, "%i ", output_wave[i]);
             serialPrint(buf);
         }
         serialPrintln("\n\n");
