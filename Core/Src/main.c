@@ -177,26 +177,13 @@ uint16_t Wave_LUT[SAMPLES] = {
 #define A_sharp_increment (A_increment *       ROOT_12_OF_2)
 #define B_increment       (A_sharp_increment * ROOT_12_OF_2)
 
-const uint16_t freq_increments [12] = {
-    17, 
-    18,
-    19,
-    20,
-    21,
-    22,
-    24,
-    25,
-    26,
-    28,
-    30,
-    32
-};
+uint16_t freq_increments [12];
 
-#define WAVETABLE_SAMPLES 1024 
+#define WAVETABLE_SAMPLES 4096
 uint16_t wavetable [WAVETABLE_SAMPLES];
 uint16_t freq_counts [12];
 
-#define OUTPUT_SAMPLES 64 
+#define OUTPUT_SAMPLES 128
 uint16_t output_wave [OUTPUT_SAMPLES];
 bool DMAkeysPressed [12];
 
@@ -208,13 +195,13 @@ inline void synthesize_waves(int index){
 
     uint32_t out = 0;
 
-    for (int f = 0; f < 3; f++){
+    for (int f = 0; f < 12; f++){
         freq_counts[f] += freq_increments[f];
         
-        out += DMAkeysPressed[f] ? wavetable[freq_counts[f] & 0x03FF] : 2048;
+        out += DMAkeysPressed[f] ? wavetable[freq_counts[f] & 0x0FFF] : 2048;
     }
 
-     output_wave[index] = out >> 4;
+     output_wave[index] = out >> 3;
 }
 
 
@@ -281,8 +268,7 @@ int main(void)
     char buf [20];
 
 
-    /*
-    float increment = 17.0;
+    float increment = 512.0;
     for(int i = 0; i < 12; i++){
         freq_increments[i] = increment;
 
@@ -290,7 +276,7 @@ int main(void)
 
         sprintf(buf, "%i ", freq_increments[i]);
         serialPrintln(buf);
-    }*/
+    }
 
 
     //Generate wave tables
@@ -653,7 +639,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 2300;
+  htim2.Init.Period = 0xFFFF;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
