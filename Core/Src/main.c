@@ -149,24 +149,9 @@ void rotationSteps(float *dreal, float *dimag);
 
 #define PI 3.14159265359
 
-/*
-uint16_t Wave_LUT[SAMPLES] = {
-    2048, 2149, 2250, 2350, 2450, 2549, 2646, 2742, 2837, 2929, 3020, 3108, 3193, 3275, 3355,
-    3431, 3504, 3574, 3639, 3701, 3759, 3812, 3861, 3906, 3946, 3982, 4013, 4039, 4060, 4076,
-    4087, 4094, 4095, 4091, 4082, 4069, 4050, 4026, 3998, 3965, 3927, 3884, 3837, 3786, 3730,
-    3671, 3607, 3539, 3468, 3394, 3316, 3235, 3151, 3064, 2975, 2883, 2790, 2695, 2598, 2500,
-    2400, 2300, 2199, 2098, 1997, 1896, 1795, 1695, 1595, 1497, 1400, 1305, 1212, 1120, 1031,
-    944, 860, 779, 701, 627, 556, 488, 424, 365, 309, 258, 211, 168, 130, 97,
-    69, 45, 26, 13, 4, 0, 1, 8, 19, 35, 56, 82, 113, 149, 189,
-    234, 283, 336, 394, 456, 521, 591, 664, 740, 820, 902, 987, 1075, 1166, 1258,
-    1353, 1449, 1546, 1645, 1745, 1845, 1946, 2047
-};*/
-
-
-
 #define ROOT_12_OF_2 1.05946
 
-#define C_samples 337
+#define C_samples 674
 #define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
 #define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
 #define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
@@ -184,7 +169,7 @@ uint16_t Wave_LUT[SAMPLES] = {
 uint16_t output_LUT[OUTPUT_SAMPLES];
 
 
-uint32_t sample_counts [12] = {
+const uint32_t sample_counts [12] = {
     C_samples,
     C_sharp_samples,
     D_samples,
@@ -199,20 +184,20 @@ uint32_t sample_counts [12] = {
     B_samples
 };
 
-uint16_t C_LUT          [C_samples];
-uint16_t C_sharp_LUT    [C_sharp_samples];
-uint16_t D_LUT          [D_samples];
-uint16_t D_sharp_LUT    [D_sharp_samples];
-uint16_t E_LUT          [E_samples];
-uint16_t F_LUT          [F_samples];
-uint16_t F_sharp_LUT    [F_sharp_samples];
-uint16_t G_LUT          [G_samples];
-uint16_t G_sharp_LUT    [G_sharp_samples];
-uint16_t A_LUT          [A_samples];
-uint16_t A_sharp_LUT    [A_sharp_samples];
-uint16_t B_LUT          [B_samples];
+int16_t C_LUT          [C_samples];
+int16_t C_sharp_LUT    [C_sharp_samples];
+int16_t D_LUT          [D_samples];
+int16_t D_sharp_LUT    [D_sharp_samples];
+int16_t E_LUT          [E_samples];
+int16_t F_LUT          [F_samples];
+int16_t F_sharp_LUT    [F_sharp_samples];
+int16_t G_LUT          [G_samples];
+int16_t G_sharp_LUT    [G_sharp_samples];
+int16_t A_LUT          [A_samples];
+int16_t A_sharp_LUT    [A_sharp_samples];
+int16_t B_LUT          [B_samples];
 
-uint16_t* lookup_tables [12] = {
+int16_t* lookup_tables [12] = {
     C_LUT,
     C_sharp_LUT,
     D_LUT,
@@ -227,22 +212,21 @@ uint16_t* lookup_tables [12] = {
     B_LUT,
 };
 
-uint16_t lookup_indeces [12];
+uint16_t lookup_indices [12];
 
 uint16_t DMAkeys;
 
 inline void synthesize_waves(int index){
 
-    uint32_t out = 0;
+    int32_t out = 0;
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
     for (int t = 0; t < 12; t++){
-        lookup_indeces[t] = (lookup_indeces[t] + 2) % sample_counts[t];
+        lookup_indices[t] = (lookup_indices[t] + 4) % sample_counts[t];
         bool key_pressed = ~DMAkeys & ( 1 << t);
-        out += key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
+        out += key_pressed ? lookup_tables[t][lookup_indices[t]] : 0;
     }
-    output_LUT[index] = out/12;
-
+    output_LUT[index] = ((uint16_t)(out >> 3)) + 2048;
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
 }
@@ -344,7 +328,7 @@ int main(void)
 
 
         for (int i = 0; i < samples; i++) {
-            lookup_tables[t][i] = 2048 + 2048 * sin(2.0 * PI * (float)i / (float) samples);
+            lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
             sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
             //serialPrintln(buf);
         }
@@ -388,7 +372,7 @@ int main(void)
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
 
   /* creation of synthesize */
-  //synthesizeHandle = osThreadNew(synthesizeTask, NULL, &synthesize_attributes);
+  synthesizeHandle = osThreadNew(synthesizeTask, NULL, &synthesize_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
         /* add threads, ... */
