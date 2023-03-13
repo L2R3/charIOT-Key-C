@@ -364,11 +364,11 @@ int main(void)
 //			//serialPrintln(buf);
 //		}
 
-////      TRUMPET (SQUARE + SINE) WAVES - HMMMMMM
+////    (SINE over SQUARE) WAVES
 		int half_samples = samples / 2;
 		for (int i = 0; i < samples; i++) {
-			lookup_tables[t][i+1] 	= (i <= half_samples) ? (1024 *(sin(2.0 * PI * (float)i / (float) samples)) + 1024*(1.0))
-													      : (1024 *(sin(2.0 * PI * (float)i / (float) samples)) + 1024*(-1.0));
+			lookup_tables[t][i] 	= (i <= half_samples) ? (2048 *(0.25*sin(2.0 * PI * (float)i / (0.25*(float) samples)) + 1.0))
+													      : (2048 *(0.25*sin(2.0 * PI * (float)i / (0.25*(float) samples)) - 1.0));
 //			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
 			//serialPrintln(buf);
 		}
