@@ -151,82 +151,194 @@ void rotationSteps(float *dreal, float *dimag);
 
 #define ROOT_12_OF_2 1.05946
 
-#define C_samples 674
-#define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
-#define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
-#define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
-#define E_samples       (uint32_t)(D_sharp_samples / ROOT_12_OF_2)
-#define F_samples       (uint32_t)(E_samples /       ROOT_12_OF_2)
-#define F_sharp_samples (uint32_t)(F_samples /       ROOT_12_OF_2)
-#define G_samples       (uint32_t)(F_sharp_samples / ROOT_12_OF_2)
-#define G_sharp_samples (uint32_t)(G_samples /       ROOT_12_OF_2)
-#define A_samples       (uint32_t)(G_sharp_samples / ROOT_12_OF_2)
-#define A_sharp_samples (uint32_t)(A_samples /       ROOT_12_OF_2)
-#define B_samples       (uint32_t)(A_sharp_samples / ROOT_12_OF_2)
+#define C_SAMPLES 337
+#define C_SHARP_SAMPLES (uint32_t)(C_SAMPLES /       ROOT_12_OF_2)
+#define D_SAMPLES       (uint32_t)(C_SHARP_SAMPLES / ROOT_12_OF_2)
+#define D_SHARP_SAMPLES (uint32_t)(D_SAMPLES /       ROOT_12_OF_2)
+#define E_SAMPLES       (uint32_t)(D_SHARP_SAMPLES / ROOT_12_OF_2)
+#define F_SAMPLES       (uint32_t)(E_SAMPLES /       ROOT_12_OF_2)
+#define F_SHARP_SAMPLES (uint32_t)(F_SAMPLES /       ROOT_12_OF_2)
+#define G_SAMPLES       (uint32_t)(F_SHARP_SAMPLES / ROOT_12_OF_2)
+#define G_SHARP_SAMPLES (uint32_t)(G_SAMPLES /       ROOT_12_OF_2)
+#define A_SAMPLES       (uint32_t)(G_SHARP_SAMPLES / ROOT_12_OF_2)
+#define A_SHARP_SAMPLES (uint32_t)(A_SAMPLES /       ROOT_12_OF_2)
+#define B_SAMPLES       (uint32_t)(A_SHARP_SAMPLES / ROOT_12_OF_2)
+
+#define O1_C_SAMPLES            C_SAMPLES / 2
+#define O1_C_SHARP_SAMPLES      C_SHARP_SAMPLES / 2 
+#define O1_D_SAMPLES            D_SAMPLES / 2
+#define O1_D_SHARP_SAMPLES      D_SHARP_SAMPLES / 2 
+#define O1_E_SAMPLES            E_SAMPLES / 2      
+#define O1_F_SAMPLES            F_SAMPLES / 2     
+#define O1_F_SHARP_SAMPLES      F_SHARP_SAMPLES / 2 
+#define O1_G_SAMPLES            G_SAMPLES / 2     
+#define O1_G_SHARP_SAMPLES      G_SHARP_SAMPLES / 2 
+#define O1_A_SAMPLES            A_SAMPLES / 2
+#define O1_A_SHARP_SAMPLES      A_SHARP_SAMPLES / 2 
+#define O1_B_SAMPLES            B_SAMPLES / 2
+
+#define O2_C_SAMPLES            C_SAMPLES / 4
+#define O2_C_SHARP_SAMPLES      C_SHARP_SAMPLES / 4 
+#define O2_D_SAMPLES            D_SAMPLES / 4
+#define O2_D_SHARP_SAMPLES      D_SHARP_SAMPLES / 4 
+#define O2_E_SAMPLES            E_SAMPLES / 4      
+#define O2_F_SAMPLES            F_SAMPLES / 4     
+#define O2_F_SHARP_SAMPLES      F_SHARP_SAMPLES / 4 
+#define O2_G_SAMPLES            G_SAMPLES / 4     
+#define O2_G_SHARP_SAMPLES      G_SHARP_SAMPLES / 4 
+#define O2_A_SAMPLES            A_SAMPLES / 4
+#define O2_A_SHARP_SAMPLES      A_SHARP_SAMPLES / 4 
+#define O2_B_SAMPLES            B_SAMPLES / 4
 
 
-#define OUTPUT_SAMPLES C_samples 
+#define OUTPUT_SAMPLES C_SAMPLES 
 uint16_t output_LUT[OUTPUT_SAMPLES];
 
+#define OCTAVES 3
 
-const uint32_t sample_counts [12] = {
-    C_samples,
-    C_sharp_samples,
-    D_samples,
-    D_sharp_samples,
-    E_samples,
-    F_samples,
-    F_sharp_samples,
-    G_samples,
-    G_sharp_samples,
-    A_samples,
-    A_sharp_samples,
-    B_samples
+const uint32_t wavetable_sizes [12 * OCTAVES] = {
+    C_SAMPLES,
+    C_SHARP_SAMPLES,
+    D_SAMPLES,
+    D_SHARP_SAMPLES,
+    E_SAMPLES,
+    F_SAMPLES,
+    F_SHARP_SAMPLES,
+    G_SAMPLES,
+    G_SHARP_SAMPLES,
+    A_SAMPLES,
+    A_SHARP_SAMPLES,
+    B_SAMPLES,
+
+    O1_C_SAMPLES,
+    O1_C_SHARP_SAMPLES,
+    O1_D_SAMPLES,
+    O1_D_SHARP_SAMPLES,
+    O1_E_SAMPLES,
+    O1_F_SAMPLES,
+    O1_F_SHARP_SAMPLES,
+    O1_G_SAMPLES,
+    O1_G_SHARP_SAMPLES,
+    O1_A_SAMPLES,
+    O1_A_SHARP_SAMPLES,
+    O1_B_SAMPLES,
+
+    O2_C_SAMPLES,
+    O2_C_SHARP_SAMPLES,
+    O2_D_SAMPLES,
+    O2_D_SHARP_SAMPLES,
+    O2_E_SAMPLES,
+    O2_F_SAMPLES,
+    O2_F_SHARP_SAMPLES,
+    O2_G_SAMPLES,
+    O2_G_SHARP_SAMPLES,
+    O2_A_SAMPLES,
+    O2_A_SHARP_SAMPLES,
+    O2_B_SAMPLES,
 };
 
-int16_t C_LUT          [C_samples];
-int16_t C_sharp_LUT    [C_sharp_samples];
-int16_t D_LUT          [D_samples];
-int16_t D_sharp_LUT    [D_sharp_samples];
-int16_t E_LUT          [E_samples];
-int16_t F_LUT          [F_samples];
-int16_t F_sharp_LUT    [F_sharp_samples];
-int16_t G_LUT          [G_samples];
-int16_t G_sharp_LUT    [G_sharp_samples];
-int16_t A_LUT          [A_samples];
-int16_t A_sharp_LUT    [A_sharp_samples];
-int16_t B_LUT          [B_samples];
+int16_t C_LUT          [C_SAMPLES];
+int16_t C_SHARP_LUT    [C_SHARP_SAMPLES];
+int16_t D_LUT          [D_SAMPLES];
+int16_t D_SHARP_LUT    [D_SHARP_SAMPLES];
+int16_t E_LUT          [E_SAMPLES];
+int16_t F_LUT          [F_SAMPLES];
+int16_t F_SHARP_LUT    [F_SHARP_SAMPLES];
+int16_t G_LUT          [G_SAMPLES];
+int16_t G_SHARP_LUT    [G_SHARP_SAMPLES];
+int16_t A_LUT          [A_SAMPLES];
+int16_t A_SHARP_LUT    [A_SHARP_SAMPLES];
+int16_t B_LUT          [B_SAMPLES];
 
-int16_t* lookup_tables [12] = {
+int16_t O1_C_LUT          [O1_C_SAMPLES];
+int16_t O1_C_SHARP_LUT    [O1_C_SHARP_SAMPLES];
+int16_t O1_D_LUT          [O1_D_SAMPLES];
+int16_t O1_D_SHARP_LUT    [O1_D_SHARP_SAMPLES];
+int16_t O1_E_LUT          [O1_E_SAMPLES];
+int16_t O1_F_LUT          [O1_F_SAMPLES];
+int16_t O1_F_SHARP_LUT    [O1_F_SHARP_SAMPLES];
+int16_t O1_G_LUT          [O1_G_SAMPLES];
+int16_t O1_G_SHARP_LUT    [O1_G_SHARP_SAMPLES];
+int16_t O1_A_LUT          [O1_A_SAMPLES];
+int16_t O1_A_SHARP_LUT    [O1_A_SHARP_SAMPLES];
+int16_t O1_B_LUT          [O1_B_SAMPLES];
+
+int16_t O2_C_LUT          [O2_C_SAMPLES];
+int16_t O2_C_SHARP_LUT    [O2_C_SHARP_SAMPLES];
+int16_t O2_D_LUT          [O2_D_SAMPLES];
+int16_t O2_D_SHARP_LUT    [O2_D_SHARP_SAMPLES];
+int16_t O2_E_LUT          [O2_E_SAMPLES];
+int16_t O2_F_LUT          [O2_F_SAMPLES];
+int16_t O2_F_SHARP_LUT    [O2_F_SHARP_SAMPLES];
+int16_t O2_G_LUT          [O2_G_SAMPLES];
+int16_t O2_G_SHARP_LUT    [O2_G_SHARP_SAMPLES];
+int16_t O2_A_LUT          [O2_A_SAMPLES];
+int16_t O2_A_SHARP_LUT    [O2_A_SHARP_SAMPLES];
+int16_t O2_B_LUT          [O2_B_SAMPLES];
+
+int16_t* lookup_tables [12 * OCTAVES] = {
     C_LUT,
-    C_sharp_LUT,
+    C_SHARP_LUT,
     D_LUT,
-    D_sharp_LUT,
+    D_SHARP_LUT,
     E_LUT,
     F_LUT,
-    F_sharp_LUT,
+    F_SHARP_LUT,
     G_LUT,
-    G_sharp_LUT,
+    G_SHARP_LUT,
     A_LUT,
-    A_sharp_LUT,
+    A_SHARP_LUT,
     B_LUT,
+
+    O1_C_LUT,
+    O1_C_SHARP_LUT,
+    O1_D_LUT,
+    O1_D_SHARP_LUT,
+    O1_E_LUT,
+    O1_F_LUT,
+    O1_F_SHARP_LUT,
+    O1_G_LUT,
+    O1_G_SHARP_LUT,
+    O1_A_LUT,
+    O1_A_SHARP_LUT,
+    O1_B_LUT,
+
+    O2_C_LUT,
+    O2_C_SHARP_LUT,
+    O2_D_LUT,
+    O2_D_SHARP_LUT,
+    O2_E_LUT,
+    O2_F_LUT,
+    O2_F_SHARP_LUT,
+    O2_G_LUT,
+    O2_G_SHARP_LUT,
+    O2_A_LUT,
+    O2_A_SHARP_LUT,
+    O2_B_LUT,
 };
 
-uint16_t lookup_indices [12];
+uint16_t lookup_indices [12 * OCTAVES];
 
-uint16_t DMAkeys;
+uint32_t DMAkeys;
 
 inline void synthesize_waves(int index){
 
     int32_t out = 0;
+    uint8_t keys_pressed = 0;
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+    
+    uint8_t octave_freq_multiplier = 1;
     for (int t = 0; t < 12; t++){
-        lookup_indices[t] = (lookup_indices[t] + 4) % sample_counts[t];
-        bool key_pressed = ~DMAkeys & ( 1 << t);
-        out += key_pressed ? lookup_tables[t][lookup_indices[t]] : 0;
+        bool pressed = ~DMAkeys & ( 1 << t);
+
+        if (pressed) {
+            lookup_indices[t] = (lookup_indices[t] + 4 * octave_freq_multiplier) % wavetable_sizes[t];
+            keys_pressed += 1;
+            out += lookup_tables[t][lookup_indices[t]];
+        }
     }
-    output_LUT[index] = ((uint16_t)(out >> 3)) + 2048;
+    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048;
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
 }
@@ -321,7 +433,7 @@ int main(void)
     char buf [20];
     for (int t = 0; t < 12; t++) {
 
-        uint32_t samples =  sample_counts[t];
+        uint32_t samples =  wavetable_sizes[t];
 
         sprintf(buf, "\n\n Lut: %i------", t);
         //serialPrintln(buf);
