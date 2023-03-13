@@ -328,14 +328,16 @@ inline void synthesize_waves(int index){
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
     
-    uint8_t octave_freq_multiplier = 1;
-    for (int t = 0; t < 12; t++){
-        bool pressed = ~DMAkeys & ( 1 << t);
+    for (int o = 0; o < 3;  o++){
 
-        if (pressed) {
-            lookup_indices[t] = (lookup_indices[t] + 4 * octave_freq_multiplier) % wavetable_sizes[t];
-            keys_pressed += 1;
-            out += lookup_tables[t][lookup_indices[t]];
+        for (int t = 0; t < 12; t++){
+            bool pressed = ~DMAkeys & ( 1 << (t));
+
+            if (pressed) {
+                lookup_indices[t] = (lookup_indices[t] + (1 << o)) % wavetable_sizes[t];
+                keys_pressed += 1;
+                out += lookup_tables[t][lookup_indices[t]];
+            }
         }
     }
     output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048;
