@@ -151,7 +151,7 @@ void rotationSteps(float *dreal, float *dimag);
 
 #define ROOT_12_OF_2 1.05946
 
-#define C_samples 674
+#define C_samples 337
 #define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
 #define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
 #define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
@@ -302,7 +302,8 @@ int main(void)
 
 
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
-    HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
+//    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t *)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
+//    HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
     setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
     delayMicro(2);
@@ -327,11 +328,51 @@ int main(void)
         //serialPrintln(buf);
 
 
-        for (int i = 0; i < samples; i++) {
-            lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
-            sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
-            //serialPrintln(buf);
-        }
+//      PURE SINE WAVES
+//        for (int i = 0; i < samples; i++) {
+//            lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
+//            sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//            //serialPrintln(buf);
+//        }
+
+//      SQUARE WAVES
+//        int half_samples = samples / 2;
+//		for (int i = 0; i < samples; i++) {
+//			lookup_tables[t][i] = (i <= half_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//			//serialPrintln(buf);
+//		}
+
+////      SAWTOOTH WAVES
+//        int half_samples = samples / 2;
+//		for (int i = 0; i < samples; i++) {
+//			lookup_tables[t][i] = (i <= half_samples) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(i-half_samples) / (float) samples);
+//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//			//serialPrintln(buf);
+//		}
+
+////      TRIANGLE WAVES
+//        int half_samples = samples / 2;
+//        int first_fourth = samples / 4;
+//        int third_fourth = half_samples + first_fourth;
+//		for (int i = 0; i < samples; i++) {
+//			lookup_tables[t][i] = (i <= first_fourth) ?
+//									2048 * ((float)(-i) / (float) samples)
+//								:
+//									(i <= third_fourth) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(samples-i) / (float) samples);
+//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//			//serialPrintln(buf);
+//		}
+
+////      TRUMPET (SQUARE + SINE) WAVES - HMMMMMM
+		int half_samples = samples / 2;
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i+1] 	= (i <= half_samples) ? (1024 *(sin(2.0 * PI * (float)i / (float) samples)) + 1024*(1.0))
+													      : (1024 *(sin(2.0 * PI * (float)i / (float) samples)) + 1024*(-1.0));
+//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+			//serialPrintln(buf);
+		}
+
     }
 
 
