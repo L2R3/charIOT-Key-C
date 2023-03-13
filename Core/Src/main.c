@@ -18,6 +18,7 @@
 #include "cmsis_os2.h"
 #include "csrc/u8g2.h"
 #include "stm32l4xx_hal_dac.h"
+#include "stm32l4xx_hal_gpio.h"
 #include "stm32l4xx_it.h"
 
 /* USER CODE END Includes */
@@ -165,7 +166,7 @@ uint16_t Wave_LUT[SAMPLES] = {
 
 #define ROOT_12_OF_2 1.05946
 
-#define C_samples 336
+#define C_samples 337
 #define C_sharp_samples (uint32_t)(C_samples /       ROOT_12_OF_2)
 #define D_samples       (uint32_t)(C_sharp_samples / ROOT_12_OF_2)
 #define D_sharp_samples (uint32_t)(D_samples /       ROOT_12_OF_2)
@@ -234,13 +235,16 @@ inline void synthesize_waves(int index){
 
     uint32_t out = 0;
 
-    for (int t = 0; t < 9; t++){
-        lookup_indeces[t] = (lookup_indeces[t] + 1) % sample_counts[t];
+    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+    for (int t = 0; t < 12; t++){
+        lookup_indeces[t] = (lookup_indeces[t] + 2) % sample_counts[t];
         bool key_pressed = ~DMAkeys & ( 1 << t);
         out += key_pressed ? lookup_tables[t][lookup_indeces[t]] : 2048;
     }
+    output_LUT[index] = out/12;
 
-    output_LUT[index] = out >> 3;
+
+    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
 }
 
 
@@ -249,26 +253,13 @@ void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
     //serialPrintln("half");
     DMAkeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
     
+
     for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
         synthesize_waves(i);
     }
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
-    /*
-    if (localKeys == 0x0FFF){
-        __HAL_RCC_DMA1_CLK_ENABLE
-    }*/
-
-    //output_LUT[i] /= 12.0;
-
-
-    //char buf [20];
-    //sprintf(buf, "%i %i", output_LUT[i], lookup_tables[1][lookup_indeces[1]]);
-    //serialPrintln(buf);
-    //
-
-    //serialPrintln("cmpl");
     
     for (int i = OUTPUT_SAMPLES/2; i < OUTPUT_SAMPLES; i++) {
         synthesize_waves(i);
@@ -690,7 +681,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 700;
+  htim2.Init.Period = 1814;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
