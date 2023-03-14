@@ -224,32 +224,34 @@ int main(void) {
 
 	serialPrintln("charIOT-Key-C");
 
-	while (1) {
+//	Joystick ADC (working)
+//	while (1) {
+//
+//		ADC_channel(6);
+//		HAL_ADC_Start(&hadc1);
+//		HAL_ADC_PollForConversion(&hadc1, 10);
+//		uint32_t adc_out2 = HAL_ADC_GetValue(&hadc1);
+//		HAL_ADC_Stop(&hadc1);
+//
+//		char adc_out2_text[7];
+//		sprintf(adc_out2_text, "X: %lu", adc_out2);
+//		serialPrintln(adc_out2_text);
+//
+//		ADC_channel(5);
+//		HAL_ADC_Start(&hadc1);
+//		HAL_ADC_PollForConversion(&hadc1, 10);
+//		uint32_t adc_out1 = HAL_ADC_GetValue(&hadc1);
+//		HAL_ADC_Stop(&hadc1);
+//
+//		char adc_out1_text[7];
+//		sprintf(adc_out1_text, "Y: %lu", adc_out1);
+//		serialPrintln(adc_out1_text);
+//
+//		HAL_Delay(100);
+//
+//	}
 
-		ADC_channel(6);
-		HAL_ADC_Start(&hadc1);
-		HAL_ADC_PollForConversion(&hadc1, 10);
-		uint32_t adc_out2 = HAL_ADC_GetValue(&hadc1);
-		HAL_ADC_Stop(&hadc1);
-
-		char adc_out2_text[7];
-		sprintf(adc_out2_text, "X: %lu", adc_out2);
-		serialPrintln(adc_out2_text);
-
-		ADC_channel(5);
-		HAL_ADC_Start(&hadc1);
-		HAL_ADC_PollForConversion(&hadc1, 10);
-		uint32_t adc_out1 = HAL_ADC_GetValue(&hadc1);
-		HAL_ADC_Stop(&hadc1);
-
-		char adc_out1_text[7];
-		sprintf(adc_out1_text, "Y: %lu", adc_out1);
-		serialPrintln(adc_out1_text);
-
-		HAL_Delay(100);
-
-	}
-
+//	CAN (working)
 //	while (1) {
 //
 //		CAN_TX(0x123, TX_Message);
@@ -275,23 +277,24 @@ int main(void) {
 //
 //	}
 
-//	while (1) {
-//
-//		UID0 = HAL_GetUIDw0();
-//
-//		char UID0text[8];
-//		sprintf(UID0text, "%lX", UID0);
-//
-//		setOutMuxBit(HKOW_BIT, GPIO_PIN_SET);
-//		setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
-//
-//		setRow(5);
-//		delayMicro(5);
-//		bool HKIW = readCols() & 0x08;
-//		setRow(6);
-//		delayMicro(5);
-//		bool HKIE = readCols() & 0x08;
-//
+//	Basic handshaking (working)
+	while (1) {
+
+		UID0 = HAL_GetUIDw0();
+
+		char UID0text[8];
+		sprintf(UID0text, "%lX", UID0);
+
+		setOutMuxBit(HKOW_BIT, GPIO_PIN_SET);
+		setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+
+		setRow(5);
+		delayMicro(5);
+		bool HKIW = readCols() & 0x08;
+		setRow(6);
+		delayMicro(5);
+		bool HKIE = readCols() & 0x08;
+
 //		char state[2];
 //		if (HKIW) {
 //			state[0] = 'W';
@@ -307,8 +310,37 @@ int main(void) {
 //		u8g2_DrawStr(&u8g2, 2, 10, UID0text);
 //		u8g2_DrawStr(&u8g2, 2, 20, state);
 //		u8g2_SendBuffer(&u8g2);
-//
-//	}
+
+		char state[2];
+		switch ((HKIW << 1) | HKIE) {
+			case 0b00: {
+				state[1] = 'O';
+				break;
+			}
+			case 0b01: {
+				state[1] = 'E';
+				break;
+			}
+			case 0b10: {
+				state[1] = 'W';
+				break;
+			}
+			case 0b11: {
+				state[1] = '1';
+				break;
+			}
+			default:
+				state[1] = '?';
+				break;
+		}
+
+		u8g2_ClearBuffer(&u8g2);
+		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+		u8g2_DrawStr(&u8g2, 2, 10, UID0text);
+		u8g2_DrawStr(&u8g2, 2, 20, state);
+		u8g2_SendBuffer(&u8g2);
+
+	}
 
 	/* USER CODE END 2 */
 
@@ -762,8 +794,7 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB,
-			RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin,
-			GPIO_PIN_RESET);
+	RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
 	GPIO_InitStruct.Pin = C0_Pin | C2_Pin | C1_Pin | C3_Pin;
