@@ -16,6 +16,7 @@
 
 // display
 #include "csrc/u8g2.h"
+#include "stm32l4xx_hal_dac.h"
 
 /* USER CODE END Includes */
 
@@ -36,6 +37,26 @@ typedef struct {
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#define PI 3.14159265359
+
+#define ROOT_12_OF_2 1.05946
+
+#define C_SAMPLES 337
+#define C_SHARP_SAMPLES (uint32_t)(C_SAMPLES /       ROOT_12_OF_2)
+#define D_SAMPLES       (uint32_t)(C_SHARP_SAMPLES / ROOT_12_OF_2)
+#define D_SHARP_SAMPLES (uint32_t)(D_SAMPLES /       ROOT_12_OF_2)
+#define E_SAMPLES       (uint32_t)(D_SHARP_SAMPLES / ROOT_12_OF_2)
+#define F_SAMPLES       (uint32_t)(E_SAMPLES /       ROOT_12_OF_2)
+#define F_SHARP_SAMPLES (uint32_t)(F_SAMPLES /       ROOT_12_OF_2)
+#define G_SAMPLES       (uint32_t)(F_SHARP_SAMPLES / ROOT_12_OF_2)
+#define G_SHARP_SAMPLES (uint32_t)(G_SAMPLES /       ROOT_12_OF_2)
+#define A_SAMPLES       (uint32_t)(G_SHARP_SAMPLES / ROOT_12_OF_2)
+#define A_SHARP_SAMPLES (uint32_t)(A_SAMPLES /       ROOT_12_OF_2)
+#define B_SAMPLES       (uint32_t)(A_SHARP_SAMPLES / ROOT_12_OF_2)
+
+#define OUTPUT_SAMPLES C_SAMPLES 
+
+
 
 /* USER CODE END PM */
 
@@ -45,9 +66,11 @@ ADC_HandleTypeDef hadc1;
 CAN_HandleTypeDef hcan1;
 
 DAC_HandleTypeDef hdac1;
+DMA_HandleTypeDef hdma_dac_ch1;
 
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
@@ -115,6 +138,57 @@ const osSemaphoreAttr_t CAN_TX_Semaphore_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+
+uint16_t output_LUT[OUTPUT_SAMPLES];
+
+const uint32_t wavetable_sizes [12] = {
+    C_SAMPLES,
+    C_SHARP_SAMPLES,
+    D_SAMPLES,
+    D_SHARP_SAMPLES,
+    E_SAMPLES,
+    F_SAMPLES,
+    F_SHARP_SAMPLES,
+    G_SAMPLES,
+    G_SHARP_SAMPLES,
+    A_SAMPLES,
+    A_SHARP_SAMPLES,
+    B_SAMPLES,
+};
+
+int16_t C_LUT          [C_SAMPLES];
+int16_t C_SHARP_LUT    [C_SHARP_SAMPLES];
+int16_t D_LUT          [D_SAMPLES];
+int16_t D_SHARP_LUT    [D_SHARP_SAMPLES];
+int16_t E_LUT          [E_SAMPLES];
+int16_t F_LUT          [F_SAMPLES];
+int16_t F_SHARP_LUT    [F_SHARP_SAMPLES];
+int16_t G_LUT          [G_SAMPLES];
+int16_t G_SHARP_LUT    [G_SHARP_SAMPLES];
+int16_t A_LUT          [A_SAMPLES];
+int16_t A_SHARP_LUT    [A_SHARP_SAMPLES];
+int16_t B_LUT          [B_SAMPLES];
+
+int16_t* lookup_tables [12] = {
+    C_LUT,
+    C_SHARP_LUT,
+    D_LUT,
+    D_SHARP_LUT,
+    E_LUT,
+    F_LUT,
+    F_SHARP_LUT,
+    G_LUT,
+    G_SHARP_LUT,
+    A_LUT,
+    A_SHARP_LUT,
+    B_LUT,
+};
+
+uint16_t lookup_indices [12];
+
+uint32_t DMAkeys;
+uint32_t DMAkeys2;
+
 const int DEN_BIT = 3;
 const int DRST_BIT = 4;
 const int HKOW_BIT = 5;
@@ -144,6 +218,7 @@ const uint32_t IDin = 0x123;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
@@ -151,6 +226,7 @@ static void MX_ADC1_Init(void);
 static void MX_DAC1_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM7_Init(void);
+static void MX_TIM2_Init(void);
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
 void displayUpdateTask(void *argument);
@@ -162,6 +238,8 @@ void CAN_Transmit(void *argument);
 void serialPrint(char val[]);
 void serialPrintln(char val[]);
 void delayMicro(uint16_t us);
+
+void synthesize_waves(int index);
 
 uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank);
 uint32_t CAN_TX(uint32_t ID, uint8_t data[8]);
@@ -219,6 +297,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_CAN1_Init();
   MX_I2C1_Init();
@@ -226,13 +305,15 @@ int main(void)
   MX_DAC1_Init();
   MX_TIM6_Init();
   MX_TIM7_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+	HAL_TIM_Base_Start(&htim2);
 	HAL_TIM_Base_Start(&htim7);
-
 	HAL_TIM_Base_Start_IT(&htim6);
 
-	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+        HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
+	//HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
 	setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
@@ -251,6 +332,24 @@ int main(void)
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
 
 	serialPrintln("charIOT-Key-C");
+
+        //Generate wave tables
+
+        char buf [20];
+        for (int t = 0; t < 12; t++) {
+
+            uint32_t samples =  wavetable_sizes[t];
+
+            sprintf(buf, "\n\n Lut: %i------", t);
+            //serialPrintln(buf);
+
+
+            for (int i = 0; i < samples; i++) {
+                lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
+                sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+                //serialPrintln(buf);
+            }
+        }
 
   /* USER CODE END 2 */
 
@@ -319,6 +418,7 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
+
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -512,9 +612,9 @@ static void MX_DAC1_Init(void)
   /** DAC channel OUT1 config
   */
   sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_T6_TRGO;
+  sConfig.DAC_Trigger = DAC_TRIGGER_T2_TRGO;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
-  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
+  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_DISABLE;
   sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
   if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_1) != HAL_OK)
   {
@@ -523,6 +623,8 @@ static void MX_DAC1_Init(void)
 
   /** DAC channel OUT2 config
   */
+  sConfig.DAC_Trigger = DAC_TRIGGER_T6_TRGO;
+  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
   if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -582,6 +684,51 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1814;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -697,6 +844,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -704,8 +867,6 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -741,11 +902,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+
 
 void serialPrint(char val[]) {
 
@@ -767,6 +928,57 @@ void delayMicro(uint16_t us) {
 	while (htim7.Instance->CNT < us)
 		;
 
+}
+
+inline void synthesize_waves(int index){
+
+    int32_t out = 0;
+    uint8_t keys_pressed = 0;
+
+    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+    
+    for (int t = 0; t < 12; t++){
+        bool pressed = ~DMAkeys & ( 1 << (t));
+
+        if (pressed) {
+            lookup_indices[t] = (lookup_indices[t] + (2)) % wavetable_sizes[t];
+            keys_pressed += 1;
+            out += lookup_tables[t][lookup_indices[t]];
+        }
+    }
+
+    for (int t = 0; t < 12; t++){
+        bool pressed = ~DMAkeys2 & ( 1 << (t));
+
+        if (pressed) {
+            lookup_indices[t] = (lookup_indices[t] + (4)) % wavetable_sizes[t];
+            keys_pressed += 1;
+            out += lookup_tables[t][lookup_indices[t]];
+        }
+    }
+
+    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048;
+
+    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+}
+
+
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
+
+    //serialPrintln("half");
+    DMAkeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+    
+
+    for (int i = 0; i < OUTPUT_SAMPLES/2; i++) {
+        synthesize_waves(i);
+    }
+}
+
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
+    
+    for (int i = OUTPUT_SAMPLES/2; i < OUTPUT_SAMPLES; i++) {
+        synthesize_waves(i);
+    }
 }
 
 uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank) {
@@ -1098,10 +1310,14 @@ void scanKeysTask(void *argument)
 
 		CAN_MSG_t TX;
 		TX.ID = IDout;
+                /*
 		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
 		for (int i = 0; i < sizeof(TX.Message); i++){
 			TX.Message[i] = msg[i];
-		}
+		}*/
+
+                TX.Message[0] = localKeys & 0x0FF;
+                TX.Message[1] = localKeys >> 8;
 
 		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
@@ -1120,7 +1336,7 @@ void displayUpdateTask(void *argument)
 {
   /* USER CODE BEGIN displayUpdateTask */
 
-	const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+	const TickType_t xFrequency = 1000 / portTICK_PERIOD_MS;
 	TickType_t xLastWakeTime = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -1143,7 +1359,14 @@ void displayUpdateTask(void *argument)
 		sprintf(hexID, "%lX", RX.ID);
 		u8g2_DrawStr(&u8g2, 2, 7, "Rid:");
 		u8g2_DrawStr(&u8g2, 15, 7, hexID);
-		u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
+		//u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
+                //
+                //
+                uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
+
+                char buf[20];
+                sprintf(buf, "%x", RX.Message[1]);
+                serialPrintln(buf);
 
 //		PRINTING VOLUME
 		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  1, "Vol:");
@@ -1180,12 +1403,13 @@ void displayUpdateTask(void *argument)
 void decode(void *argument)
 {
   /* USER CODE BEGIN decode */
-	/* Infinite loop */
-	for (;;) {
+    /* Infinite loop */
+    for (;;) {
+        osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
+        
+        __atomic_store_n(&DMAkeys2, RX.Message[0] | (RX.Message[1] << 8), __ATOMIC_RELAXED);
 
-		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
-
-	}
+    }
   /* USER CODE END decode */
 }
 
@@ -1224,59 +1448,6 @@ void CAN_Transmit(void *argument)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  /* USER CODE BEGIN Callback 0 */
-
-	if (htim == &htim6) {
-
-//		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
-
-		static float real[12] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-		static float imag[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-		float real2;
-		float imag2;
-
-		float Vadd = 0;
-
-		uint16_t localKeys;
-
-		localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-
-		for (int i = 0; i < 12; i++) {
-
-			if (!(localKeys & 1)) {
-
-				real2 = dreal[i] * real[i] - dimag[i] * imag[i];
-				imag2 = dimag[i] * real[i] + dreal[i] * imag[i];
-
-				real[i] = real2;
-				imag[i] = imag2;
-
-				Vadd += real[i];
-
-			}
-
-			localKeys >>= 1;
-
-		}
-
-		int16_t Vout = (int16_t) 512 * Vadd / 12.0 * volume;
-
-		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, Vout + 2048);
-		HAL_DAC_SetValue(&hdac1, DAC1_CHANNEL_2, DAC_ALIGN_12B_R, Vout + 2048);
-
-//		HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin,
-//				GPIO_PIN_RESET);
-
-	}
-
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM16) {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
-
-  /* USER CODE END Callback 1 */
 }
 
 /**
