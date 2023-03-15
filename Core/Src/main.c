@@ -257,6 +257,7 @@ uint16_t readKeys();
 uint16_t readKnobs();
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume);
 void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index );
+void choose_wave_gen(uint8_t wave, int table, uint32_t samples);
 
 void rotationSteps(float *dreal, float *dimag);
 
@@ -343,12 +344,12 @@ int main(void)
             sprintf(buf, "\n\n Lut: %i------", t);
             //serialPrintln(buf);
 
-
-            for (int i = 0; i < samples; i++) {
-                lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
-                sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
-                //serialPrintln(buf);
-            }
+            choose_wave_gen(2, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
+//            for (int i = 0; i < samples; i++) {
+//                lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
+//                sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//                //serialPrintln(buf);
+//            }
         }
 
   /* USER CODE END 2 */
@@ -957,7 +958,7 @@ inline void synthesize_waves(int index){
         }
     }
 
-    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048;
+    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048; // VOLUME to be added here
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
 }
@@ -1211,6 +1212,59 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index ) {
 
 }
 
+void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
+	if(wave == 0){
+		//      SAWTOOTH WAVES
+		int half_samples = samples / 2;
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i] = (i <= half_samples) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(i-half_samples) / (float) samples);
+		}
+	} else if(wave == 1){
+		//      PURE SINE WAVES
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
+		}
+	} else if(wave == 2){
+		//      SQUARE WAVES
+		int half_samples = samples / 2;
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i] = (i <= half_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+		}
+	} else if(wave == 3){
+		//      TRIANGLE WAVES
+		int half_samples = samples / 2;
+		int first_fourth = samples / 4;
+		int third_fourth = half_samples + first_fourth;
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i] = (i <= first_fourth) ?
+									2048 * ((float)(-i) / (float) samples)
+								:
+									(i <= third_fourth) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(samples-i) / (float) samples);
+		}
+	} else if(wave == 4){
+		////    Special WAVE
+		int half_samples = samples / 2;
+		int amp = 8;
+		for (int i = 0; i < samples; i++) {
+			float harmonic_sample =  sin(2.0 * PI * (float)i / ((float) samples));
+			harmonic_sample += sin(2.0 * PI * (float)i * 3 / ((float) samples)) / 3;
+			harmonic_sample += sin(2.0 * PI * (float)i * 7 / ((float) samples)) / 7;
+			harmonic_sample += sin(2.0 * PI * (float)i * 8 / ((float) samples)) / 8;
+//			for(int harmonic = 2; harmonic <= 7 ; harmonic+=2) {
+//				harmonic_sample += sin(2.0 * PI * (float)i * harmonic / ((float) samples)) / harmonic;
+//	        }
+			lookup_tables[t][i] 	= (amp * harmonic_sample);
+			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
+		}
+	} else {
+		//      SAWTOOTH WAVES
+		int half_samples = samples / 2;
+		for (int i = 0; i < samples; i++) {
+			lookup_tables[t][i] = (i <= half_samples) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(i-half_samples) / (float) samples);
+		}
+	}
+}
+
 void rotationSteps(float *dreal, float *dimag) {
 
 	float phi;
@@ -1336,7 +1390,7 @@ void displayUpdateTask(void *argument)
 {
   /* USER CODE BEGIN displayUpdateTask */
 
-	const TickType_t xFrequency = 1000 / portTICK_PERIOD_MS;
+	const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
 	TickType_t xLastWakeTime = xTaskGetTickCount();
 
 	/* Infinite loop */
