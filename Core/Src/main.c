@@ -206,7 +206,7 @@ volatile uint16_t keys = 0x0FFF;
 volatile uint16_t prev_keys = 0x0FFF;
 volatile uint16_t knobs = 0xFF;
 volatile uint16_t prev_knobs = 0xFF;
-uint16_t volume = 4;
+uint16_t volume = 8;
 
 //uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
 
@@ -259,7 +259,7 @@ int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t 
 void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index );
 void choose_wave_gen(uint8_t wave, int table, uint32_t samples);
 
-void rotationSteps(float *dreal, float *dimag);
+//void rotationSteps(float *dreal, float *dimag);
 
 /* USER CODE END PFP */
 
@@ -276,7 +276,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-	rotationSteps(dreal, dimag);
+//	rotationSteps(dreal, dimag);
 
   /* USER CODE END 1 */
 
@@ -313,9 +313,9 @@ int main(void)
 	HAL_TIM_Base_Start(&htim7);
 	HAL_TIM_Base_Start_IT(&htim6);
 
-        HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
-	//HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_LUT, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
+//	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+//	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
 	setOutMuxBit(DRST_BIT, GPIO_PIN_RESET);
 	delayMicro(2);
@@ -344,7 +344,7 @@ int main(void)
             sprintf(buf, "\n\n Lut: %i------", t);
             //serialPrintln(buf);
 
-            choose_wave_gen(2, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
+            choose_wave_gen(1, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
 //            for (int i = 0; i < samples; i++) {
 //                lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
 //                sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
@@ -404,7 +404,7 @@ int main(void)
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
 
   /* creation of decodeTask */
-  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
+//  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
 
   /* creation of CAN_TX_TaskName */
   CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
@@ -948,17 +948,17 @@ inline void synthesize_waves(int index){
         }
     }
 
-    for (int t = 0; t < 12; t++){
-        bool pressed = ~DMAkeys2 & ( 1 << (t));
+//    for (int t = 0; t < 12; t++){
+//        bool pressed = ~DMAkeys2 & ( 1 << (t));
+//
+//        if (pressed) {
+//            lookup_indices[t] = (lookup_indices[t] + (4)) % wavetable_sizes[t];
+//            keys_pressed += 1;
+//            out += lookup_tables[t][lookup_indices[t]];
+//        }
+//    }
 
-        if (pressed) {
-            lookup_indices[t] = (lookup_indices[t] + (4)) % wavetable_sizes[t];
-            keys_pressed += 1;
-            out += lookup_tables[t][lookup_indices[t]];
-        }
-    }
-
-    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048; // VOLUME to be added here
+    output_LUT[index] = ((uint16_t)(out >> (12 - volume))) + 2048; // VOLUME to be added here
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
 }
@@ -1154,7 +1154,7 @@ int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t 
 	int16_t rotation = 0;
 	int current_knob = knob_state;
 	int prev_knob = previousKnobState;
-	int8_t top_limit = 8;
+	int8_t top_limit = 12;
 	int8_t bottom_limit = 0;
 
 	// upper and bottom levels for volume
@@ -1244,7 +1244,7 @@ void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
 	} else if(wave == 4){
 		////    Special WAVE
 		int half_samples = samples / 2;
-		int amp = 8;
+//		int amp = 8;
 		for (int i = 0; i < samples; i++) {
 			float harmonic_sample =  sin(2.0 * PI * (float)i / ((float) samples));
 			harmonic_sample += sin(2.0 * PI * (float)i * 3 / ((float) samples)) / 3;
@@ -1253,8 +1253,8 @@ void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
 //			for(int harmonic = 2; harmonic <= 7 ; harmonic+=2) {
 //				harmonic_sample += sin(2.0 * PI * (float)i * harmonic / ((float) samples)) / harmonic;
 //	        }
-			lookup_tables[t][i] 	= (amp * harmonic_sample);
-			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
+			lookup_tables[t][i] 	= (harmonic_sample);
+//			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
 		}
 	} else {
 		//      SAWTOOTH WAVES
@@ -1265,19 +1265,19 @@ void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
 	}
 }
 
-void rotationSteps(float *dreal, float *dimag) {
-
-	float phi;
-
-	for (int i = 0; i < 12; i++) {
-
-		phi = 2 * M_PI * fA * pow(2, (i - 9) / 12.0) / fs;
-		dreal[i] = cos(phi);
-		dimag[i] = sin(phi);
-
-	}
-
-}
+//void rotationSteps(float *dreal, float *dimag) {
+//
+//	float phi;
+//
+//	for (int i = 0; i < 12; i++) {
+//
+//		phi = 2 * M_PI * fA * pow(2, (i - 9) / 12.0) / fs;
+//		dreal[i] = cos(phi);
+//		dimag[i] = sin(phi);
+//
+//	}
+//
+//}
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
@@ -1359,21 +1359,22 @@ void scanKeysTask(void *argument)
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 3);
 
 		osMutexAcquire(keysMutexHandle, osWaitForever);
-		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
+		__atomic_store_n(&DMAkeys, localKeys, __ATOMIC_RELAXED);
 		osMutexRelease(keysMutexHandle);
 
-		CAN_MSG_t TX;
-		TX.ID = IDout;
-                /*
-		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
-		for (int i = 0; i < sizeof(TX.Message); i++){
-			TX.Message[i] = msg[i];
-		}*/
-
-                TX.Message[0] = localKeys & 0x0FF;
-                TX.Message[1] = localKeys >> 8;
-
-		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+//		---------------------------- SEND OVER CAN
+//		CAN_MSG_t TX;
+//		TX.ID = IDout;
+//                /*
+//		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
+//		for (int i = 0; i < sizeof(TX.Message); i++){
+//			TX.Message[i] = msg[i];
+//		}*/
+//
+//                TX.Message[0] = localKeys & 0x0FF;
+//                TX.Message[1] = localKeys >> 8;
+//
+//		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
 	}
   /* USER CODE END scanKeysTask */
@@ -1416,7 +1417,7 @@ void displayUpdateTask(void *argument)
 		//u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
                 //
                 //
-                uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
+//                uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
 
                 char buf[20];
                 sprintf(buf, "%x", RX.Message[1]);
@@ -1502,6 +1503,15 @@ void CAN_Transmit(void *argument)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+	/* USER CODE BEGIN Callback 0 */
+
+	/* USER CODE END Callback 0 */
+	if (htim->Instance == TIM16) {
+		HAL_IncTick();
+	}
+	/* USER CODE BEGIN Callback 1 */
+
+	/* USER CODE END Callback 1 */
 }
 
 /**
