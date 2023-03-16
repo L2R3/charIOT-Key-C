@@ -207,6 +207,8 @@ volatile uint16_t prev_keys = 0x0FFF;
 volatile uint16_t knobs = 0xFF;
 volatile uint16_t prev_knobs = 0xFF;
 uint16_t volume = 8;
+uint16_t octave = 0;
+uint8_t wave_form = 0;
 
 //uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
 
@@ -255,8 +257,8 @@ void setRow(uint8_t rowIdx);
 uint8_t readCols();
 uint16_t readKeys();
 uint16_t readKnobs();
-int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume);
-void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index );
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit, int8_t bottom_limit);
+void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type );
 void choose_wave_gen(uint8_t wave, int table, uint32_t samples);
 
 //void rotationSteps(float *dreal, float *dimag);
@@ -334,7 +336,7 @@ int main(void)
 
 	serialPrintln("charIOT-Key-C");
 
-        //Generate wave tables
+        //Generate initial wave tables
 
         char buf [20];
         for (int t = 0; t < 12; t++) {
@@ -344,7 +346,7 @@ int main(void)
             sprintf(buf, "\n\n Lut: %i------", t);
             //serialPrintln(buf);
 
-            choose_wave_gen(1, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
+            choose_wave_gen(wave_form, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
 //            for (int i = 0; i < samples; i++) {
 //                lookup_tables[t][i] = 2048 * sin(2.0 * PI * (float)i / (float) samples);
 //                sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
@@ -404,7 +406,7 @@ int main(void)
   displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
 
   /* creation of decodeTask */
-//  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
+  decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
 
   /* creation of CAN_TX_TaskName */
   CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
@@ -958,6 +960,7 @@ inline void synthesize_waves(int index){
 //        }
 //    }
 
+//    output_LUT[index] = ((uint16_t)(out / (1 + keys_pressed))) + 2048; // VOLUME to be added here
     output_LUT[index] = ((uint16_t)(out >> (12 - volume))) + 2048; // VOLUME to be added here
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
@@ -1150,14 +1153,12 @@ uint16_t readKnobs() {
 
 }
 
-int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation){
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation, int8_t top_limit, int8_t bottom_limit){
 	int16_t rotation = 0;
 	int current_knob = knob_state;
 	int prev_knob = previousKnobState;
-	int8_t top_limit = 12;
-	int8_t bottom_limit = 0;
 
-	// upper and bottom levels for volume
+	// upper and bottom levels for knob
 	if ((((prev_knob == 0b11) && (current_knob == 0b10)) ||
 	  ((prev_knob == 0b00) && (current_knob == 0b01))) &&
 		knobRotation < top_limit
@@ -1174,7 +1175,7 @@ int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t 
 	return rotation;
 }
 
-void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index ) {
+void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char type ) {
 	uint8_t shift_row = (knob_index >= 2) ? 0 : 4;
 	uint8_t row = 0xF;
 	uint8_t knob_on_row = 1 - knob_index % 2;
@@ -1189,15 +1190,6 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index ) {
 	uint8_t knobState		  = (rowKnobStates 	   >> knob_on_row*2) & 0b11;
 	uint8_t previousKnobState = (rowPrevKnobStates >> knob_on_row*2) & 0b11;
 
-//	sprintf(s, "3 knobState:         %x", knobState);
-//	serialPrintln(s);
-//	sprintf(s, "3 previousKnobState: %x", previousKnobState);
-//	serialPrintln(s);
-
-	int16_t change_volume = changeKnobState(knobState, previousKnobState, volume);
-	volume = volume + change_volume;
-//	sprintf(s, "volume: %d", volume);
-//	serialPrintln(s);
 
 //	UPDATE GLOBAL VARIABLES
 	osMutexAcquire(knobsMutexHandle, osWaitForever);
@@ -1208,6 +1200,28 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index ) {
 		osMutexAcquire(knobsMutexHandle, osWaitForever);
 		__atomic_store_n(&prev_knobs, localKnobs, __ATOMIC_RELAXED);
 		osMutexRelease(knobsMutexHandle);
+
+		if (type == 'v'){
+			int16_t change_volume = changeKnobState(knobState, previousKnobState, volume, 12, 0);
+			volume = volume + change_volume;
+		//	sprintf(s, "volume: %d", volume);
+		//	serialPrintln(s);
+		} else if (type == 'o'){
+			int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 5, 0);
+			octave = octave + change_octave;
+		//	sprintf(s, "octave: %d", octave);
+		//	serialPrintln(s);
+		} else if (type == 'w'){
+			int16_t change_wave = changeKnobState(knobState, previousKnobState, wave_form, 4, 0);
+			wave_form = wave_form + change_wave;
+		//	sprintf(s, "wave_form: %d", wave_form);
+		//	serialPrintln(s);
+			for (int t = 0; t < 12; t++) {
+//			TODO: TIMING PROBLEM - might take too long to generate lookup tables at every change of the wave form knob
+				uint32_t samples =  wavetable_sizes[t];
+				choose_wave_gen(wave_form, t, samples); // 0 - sawtooth; 1 - sine; 2 - square; 3 - triangle; 4 - special; other/default - sawtooth
+			}
+		}
 	}
 
 }
@@ -1243,18 +1257,12 @@ void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
 		}
 	} else if(wave == 4){
 		////    Special WAVE
-		int half_samples = samples / 2;
-//		int amp = 8;
 		for (int i = 0; i < samples; i++) {
 			float harmonic_sample =  sin(2.0 * PI * (float)i / ((float) samples));
 			harmonic_sample += sin(2.0 * PI * (float)i * 3 / ((float) samples)) / 3;
 			harmonic_sample += sin(2.0 * PI * (float)i * 7 / ((float) samples)) / 7;
 			harmonic_sample += sin(2.0 * PI * (float)i * 8 / ((float) samples)) / 8;
-//			for(int harmonic = 2; harmonic <= 7 ; harmonic+=2) {
-//				harmonic_sample += sin(2.0 * PI * (float)i * harmonic / ((float) samples)) / harmonic;
-//	        }
-			lookup_tables[t][i] 	= (harmonic_sample);
-//			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
+			lookup_tables[t][i] = (2048 * harmonic_sample);
 		}
 	} else {
 		//      SAWTOOTH WAVES
@@ -1343,6 +1351,7 @@ void scanKeysTask(void *argument)
 
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
+
 		uint16_t localKeys = readKeys();
 		uint16_t localKnobs = readKnobs();
 
@@ -1356,25 +1365,27 @@ void scanKeysTask(void *argument)
 //		serialPrint("knobs: ");
 //		serialPrintln(knobs_s);
 
-		scanKnob(localKnobs, (uint16_t) prev_knobs, 3);
+		scanKnob(localKnobs, (uint16_t) prev_knobs, 3, 'v');
+		scanKnob(localKnobs, (uint16_t) prev_knobs, 2, 'o');
+		scanKnob(localKnobs, (uint16_t) prev_knobs, 1, 'w');
 
 		osMutexAcquire(keysMutexHandle, osWaitForever);
-		__atomic_store_n(&DMAkeys, localKeys, __ATOMIC_RELAXED);
+		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
 		osMutexRelease(keysMutexHandle);
 
 //		---------------------------- SEND OVER CAN
-//		CAN_MSG_t TX;
-//		TX.ID = IDout;
-//                /*
-//		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
-//		for (int i = 0; i < sizeof(TX.Message); i++){
-//			TX.Message[i] = msg[i];
-//		}*/
-//
-//                TX.Message[0] = localKeys & 0x0FF;
-//                TX.Message[1] = localKeys >> 8;
-//
-//		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+		CAN_MSG_t TX;
+		TX.ID = IDout;
+                /*
+		char *msg = "AliBest!"; // just remember to stick to size of TX.Message, if it is bigger, it gets cut off
+		for (int i = 0; i < sizeof(TX.Message); i++){
+			TX.Message[i] = msg[i];
+		}*/
+
+                TX.Message[0] = localKeys & 0x0FF;
+                TX.Message[1] = localKeys >> 8;
+
+		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
 	}
   /* USER CODE END scanKeysTask */
@@ -1424,10 +1435,22 @@ void displayUpdateTask(void *argument)
                 serialPrintln(buf);
 
 //		PRINTING VOLUME
-		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  1, "Vol:");
+		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  2, "Vol:");
 		char volume_s[16];
 		sprintf(volume_s, "%x", volume);
 		u8g2_DrawStr(&u8g2, 118, 30, volume_s);
+
+//		PRINTING Octave
+		u8g2_DrawButtonUTF8(&u8g2, 105, 17, U8G2_BTN_BW1, 18,  4,  2, "Oct:");
+		char s[16];
+		sprintf(s, "%x", octave);
+		u8g2_DrawStr(&u8g2, 120, 17, s);
+
+//		PRINTING WAVE_FORM
+		u8g2_DrawButtonUTF8(&u8g2, 67, 30, U8G2_BTN_BW1, 22,  4,  1, "Wave:");
+		char wave_s[16];
+		sprintf(wave_s, "%x", wave_form);
+		u8g2_DrawStr(&u8g2, 86, 30, wave_s);
 
 //		PRINTING PET
 		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
