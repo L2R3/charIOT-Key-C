@@ -6228,8 +6228,8 @@ int main(void) {
  8002bd0:	08002be5 	.word	0x08002be5
  8002bd4:	08002beb 	.word	0x08002beb
 			case 0b00: {
-				state[1] = '0';
- 8002bd8:	2330      	movs	r3, #48	; 0x30
+				state[1] = 'O';
+ 8002bd8:	234f      	movs	r3, #79	; 0x4f
  8002bda:	707b      	strb	r3, [r7, #1]
 				break;
  8002bdc:	e00b      	b.n	8002bf6 <main+0x156>
