@@ -207,7 +207,8 @@ volatile uint16_t prev_keys = 0x0FFF;
 volatile uint16_t knobs = 0xFF;
 volatile uint16_t prev_knobs = 0xFF;
 uint16_t volume = 8;
-uint16_t octave = 0;
+uint16_t octave = 3;
+uint16_t default_octave = 3;
 uint8_t wave_form = 0;
 
 //uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
@@ -937,6 +938,7 @@ inline void synthesize_waves(int index){
 
     int32_t out = 0;
     uint8_t keys_pressed = 0;
+    int8_t step_octave = (octave >= default_octave) ? 2*(octave - default_octave) : -1; // default octave is 3
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
     
@@ -944,7 +946,7 @@ inline void synthesize_waves(int index){
         bool pressed = ~DMAkeys & ( 1 << (t));
 
         if (pressed) {
-            lookup_indices[t] = (lookup_indices[t] + (2)) % wavetable_sizes[t];
+            lookup_indices[t] = (lookup_indices[t] + (2+step_octave)) % wavetable_sizes[t];
             keys_pressed += 1;
             out += lookup_tables[t][lookup_indices[t]];
         }
@@ -1207,7 +1209,7 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char 
 		//	sprintf(s, "volume: %d", volume);
 		//	serialPrintln(s);
 		} else if (type == 'o'){
-			int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 5, 0);
+			int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8, 2); // can only go one lower than the default octave
 			octave = octave + change_octave;
 		//	sprintf(s, "octave: %d", octave);
 		//	serialPrintln(s);
@@ -1441,26 +1443,26 @@ void displayUpdateTask(void *argument)
 		u8g2_DrawStr(&u8g2, 118, 30, volume_s);
 
 //		PRINTING Octave
-		u8g2_DrawButtonUTF8(&u8g2, 105, 17, U8G2_BTN_BW1, 18,  4,  2, "Oct:");
+		u8g2_DrawButtonUTF8(&u8g2, 75, 30, U8G2_BTN_BW1, 18,  4,  2, "Oct:");
 		char s[16];
 		sprintf(s, "%x", octave);
-		u8g2_DrawStr(&u8g2, 120, 17, s);
+		u8g2_DrawStr(&u8g2, 89, 30, s);
 
 //		PRINTING WAVE_FORM
-		u8g2_DrawButtonUTF8(&u8g2, 67, 30, U8G2_BTN_BW1, 22,  4,  1, "Wave:");
+		u8g2_DrawButtonUTF8(&u8g2, 41, 30, U8G2_BTN_BW1, 22,  4,  2, "Wave:");
 		char wave_s[16];
 		sprintf(wave_s, "%x", wave_form);
-		u8g2_DrawStr(&u8g2, 86, 30, wave_s);
+		u8g2_DrawStr(&u8g2, 61, 30, wave_s);
 
 //		PRINTING PET
 		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
 		if (localKeys == 0x0FFF) {
 
-			u8g2_DrawStr(&u8g2, 2, 30, "- ^_^ -");
+			u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
 
 		} else {
 
-			u8g2_DrawStr(&u8g2, 2, 30, "- ^0^ -");
+			u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
 
 		}
 
