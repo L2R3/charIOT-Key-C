@@ -1273,7 +1273,22 @@ void decode(void *argument)
 		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
 		if (RX.Message[0] == 'H') {
+
 			keyboard_count += 1;
+
+			// termination (UNTESTED)
+
+			if (RX.Message[1] == 'X') {
+
+				handshakeRequest = 0;	// or osEventFlagsClear
+
+				// write the signals again to check for future disconnections
+				setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+				setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+
+				// HERE, insert code to (re)start everything else
+			}
+
 		}
 
 //		char hexID[3];
@@ -1326,20 +1341,28 @@ void handshake(void *argument)
 {
   /* USER CODE BEGIN handshake */
 
-	if (handshakeRequest) {
+	if (handshakeRequest) {	// this could replaced with a flag ?
+		// maybe something like osEventFlagsWait ?
+		// osEventFlagsSet could be called from the task reading user inputs
 
-		// set the handshaking bits
+		// write the outgoing handshaking signals to high
 		setOutMuxBit(HKOW_BIT, GPIO_PIN_SET);
 		setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
 
 		HAL_Delay(2000);
 
-		// read handshake east
+		// read the east-side incoming handshaking signal
+		// the signal is inverted, ie, 0 if there is a keyboard attached
+		// hence, here, only the last keyboard will read high
+		// this is used to terminate the handshaking process
 		setRow(6);
 		delayMicro(5);
 		bool HKIE = readCols() & 0x08;
 
-		// read hanshake west repeatedly.
+		// the keyboards turn off their east outgoing signal in turn
+		// starting from the leftmost keyboard
+
+		// wait for the west-side handshaking signal to go high
 		setRow(5);
 		delayMicro(5);
 		bool HKIW = readCols() & 0x08;
@@ -1348,7 +1371,13 @@ void handshake(void *argument)
 			HAL_Delay(100);
 		}
 
+		// keyboard_count is incremented at every received CAN message
+		// -> see the decode task
+
 		keyboard_position = keyboard_count - 1;
+
+		// inform other keyboards
+		// send unique ID and position as per instructions
 
 		CAN_MSG_t TX;
 
@@ -1361,6 +1390,8 @@ void handshake(void *argument)
 		TX.Message[5] = keyboard_position;
 
 		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+		// display the data to check
 
 		char UID0text[8];
 		sprintf(UID0text, "%lX", UID0);
@@ -1376,7 +1407,30 @@ void handshake(void *argument)
 
 		HAL_Delay(100);
 
+		// turn off the east outgoing signal to inform the next keyboard
 		setOutMuxBit(HKOE_BIT, GPIO_PIN_RESET);
+
+		// termination (UNTESTED)
+
+		if (HKIE) {
+
+			handshakeRequest = 0;	// or osEventFlagsClear
+
+			CAN_MSG_t TX_end;
+
+			TX_end.ID = IDout;
+			TX_end.Message[0] = 'H';
+			TX_end.Message[1] = 'X';
+
+			osMessageQueuePut(msgOutQHandle, &TX_end, 0, 0);
+
+			// write the signals again to check for future disconnections
+			setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+			setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+
+			// HERE, insert code to (re)start everything else
+
+		}
 
 	}
 
