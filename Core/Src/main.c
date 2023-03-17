@@ -211,6 +211,17 @@ uint16_t octave = 3;
 uint16_t default_octave = 3;
 uint8_t wave_form = 0;
 
+const char* keyNotes[12] = {
+  "Do", "Do#",
+  "Re", "Re#",
+  "Mi",
+  "Fa", "Fa#",
+  "Sol", "Sol#",
+  "La", "La#",
+  "Si"
+};
+char* notesPressed[12] = {'-','-','-','-','-','-','-','-','-','-','-','-'};
+
 //uint8_t TX_Message[8] = {'A', 'L', 'I', 'B', 'E', 'S', 'T', '!'};
 
 const uint32_t IDout = 0x123;
@@ -261,6 +272,7 @@ uint16_t readKnobs();
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit, int8_t bottom_limit);
 void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type );
 void choose_wave_gen(uint8_t wave, int table, uint32_t samples);
+void display_wave(uint16_t x, uint16_t y);
 
 //void rotationSteps(float *dreal, float *dimag);
 
@@ -1275,6 +1287,36 @@ void choose_wave_gen(uint8_t wave, int t, uint32_t samples){
 	}
 }
 
+void display_wave(uint16_t x, uint16_t y){
+	switch(wave_form){
+		case 0: //SAWTOOTH
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, "//");
+			break;
+		case 1: //SINE
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, "◠◡");
+			break;
+		case 2: //SQUARE
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, " \u25a0");
+			break;
+		case 3: //TRIANGLE
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, " \u25b2");
+			break;
+		case 4: //special
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, " \u265b");
+			break;
+		default://SAWTOOTH
+			u8g2_SetFont(&u8g2, u8g2_font_7x13_t_symbols);
+			u8g2_DrawUTF8(&u8g2, x, y, "//");
+			break;
+	}
+
+}
+
 //void rotationSteps(float *dreal, float *dimag) {
 //
 //	float phi;
@@ -1366,6 +1408,17 @@ void scanKeysTask(void *argument)
 //		serialPrintln(key_s);
 //		serialPrint("knobs: ");
 //		serialPrintln(knobs_s);
+		uint8_t keys_pressed = 0;
+		for (int t = 0; t < 12; t++){
+			bool pressed = ~localKeys & ( 1 << (t));
+
+			if (pressed) {
+				notesPressed[t] = keyNotes[t];
+				keys_pressed += 1;
+			} else {
+				notesPressed[t] = '-';
+			}
+		}
 
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 3, 'v');
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 2, 'o');
@@ -1422,19 +1475,25 @@ void displayUpdateTask(void *argument)
 		u8g2_ClearBuffer(&u8g2);
 		u8g2_SetFont(&u8g2, u8g2_font_new3x9pixelfont_tr);
 
-//		PRINTING THE CAN RECEIVED MESSAGE and ID
-		char hexID[3];
-		sprintf(hexID, "%lX", RX.ID);
-		u8g2_DrawStr(&u8g2, 2, 7, "Rid:");
-		u8g2_DrawStr(&u8g2, 15, 7, hexID);
-		//u8g2_DrawStr(&u8g2, 2, 16, (char*) RX.Message);
-                //
-                //
+//		PRINTING THE NOTES PRESSED
+		uint8_t string_size = 2;
+		uint8_t space = 3;
+		char o_s[16];
+		sprintf(o_s, "|%x|", octave);
+		u8g2_DrawStr(&u8g2, string_size, 7, o_s);
+		string_size += 10;
+		for (int t = 0; t < 12; t++){
+			if (notesPressed[t] != '-') {
+				uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
+				u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);
+				string_size += w + space;
+			}
+		}
 //                uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
 
-                char buf[20];
-                sprintf(buf, "%x", RX.Message[1]);
-                serialPrintln(buf);
+				char buf[20];
+				sprintf(buf, "%x", RX.Message[1]);
+				serialPrintln(buf);
 
 //		PRINTING VOLUME
 		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  2, "Vol:");
@@ -1449,20 +1508,28 @@ void displayUpdateTask(void *argument)
 		u8g2_DrawStr(&u8g2, 89, 30, s);
 
 //		PRINTING WAVE_FORM
-		u8g2_DrawButtonUTF8(&u8g2, 41, 30, U8G2_BTN_BW1, 22,  4,  2, "Wave:");
+		u8g2_DrawButtonUTF8(&u8g2, 33, 30, 0, 30,  4,  3, "Wave:");
 		char wave_s[16];
 		sprintf(wave_s, "%x", wave_form);
-		u8g2_DrawStr(&u8g2, 61, 30, wave_s);
+//		u8g2_DrawStr(&u8g2, 61, 30, wave_s);
+		display_wave(51, 30);
 
 //		PRINTING PET
 		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
 		if (localKeys == 0x0FFF) {
 
-			u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
+//			u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
+			u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t);
+			u8g2_DrawUTF8(&u8g2, 2, 30, " \u029a");
 
 		} else {
 
-			u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
+//			u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
+			u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t); //21x21
+			u8g2_DrawUTF8(&u8g2, 2, 30, " \u0299");
+			u8g2_SetFont(&u8g2, u8g2_font_unifont_t_0_76); //16x16
+			u8g2_DrawUTF8(&u8g2, 16, 27, " \u266a");
+			u8g2_DrawUTF8(&u8g2, 13, 19, " \u266a");
 
 		}
 
