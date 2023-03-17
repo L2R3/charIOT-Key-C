@@ -15,8 +15,10 @@
 #include <string.h>
 
 // display
+#include "cmsis_os2.h"
 #include "csrc/u8g2.h"
 #include "stm32l4xx_hal_dac.h"
+#include "stm32l4xx_hal_gpio.h"
 
 /* USER CODE END Includes */
 
@@ -111,6 +113,13 @@ const osThreadAttr_t CAN_TX_TaskName_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for handshakeTask */
+osThreadId_t handshakeTaskHandle;
+const osThreadAttr_t handshakeTask_attributes = {
+  .name = "handshakeTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for msgInQ */
 osMessageQueueId_t msgInQHandle;
 const osMessageQueueAttr_t msgInQ_attributes = {
@@ -130,6 +139,11 @@ const osMutexAttr_t keysMutex_attributes = {
 osMutexId_t knobsMutexHandle;
 const osMutexAttr_t knobsMutex_attributes = {
   .name = "knobsMutex"
+};
+/* Definitions for read mutex */
+osMutexId_t readMutexHandle;
+const osMutexAttr_t readMutex_attributes = {
+  .name = "readMutex"
 };
 /* Definitions for CAN_TX_Semaphore */
 osSemaphoreId_t CAN_TX_SemaphoreHandle;
@@ -189,6 +203,8 @@ uint16_t lookup_indices [12];
 uint32_t DMAkeys;
 uint32_t DMAkeys2;
 
+volatile bool outbits [7] = {1, 1, 1, 1, 1, 1, 1};  
+
 const int DEN_BIT = 3;
 const int DRST_BIT = 4;
 const int HKOW_BIT = 5;
@@ -206,6 +222,10 @@ volatile uint16_t keys = 0x0FFF;
 volatile uint16_t prev_keys = 0x0FFF;
 volatile uint16_t knobs = 0xFF;
 volatile uint16_t prev_knobs = 0xFF;
+
+volatile bool HKIW = false;
+volatile bool HKIE = false;
+
 uint16_t volume = 8;
 uint16_t octave = 3;
 uint16_t default_octave = 3;
@@ -227,6 +247,13 @@ char* notesPressed[12] = {'-','-','-','-','-','-','-','-','-','-','-','-'};
 const uint32_t IDout = 0x123;
 const uint32_t IDin = 0x123;
 
+uint32_t UID0;
+
+// handshaking
+bool handshakeRequest = 1;
+volatile uint8_t keyboard_count = 1;
+volatile uint8_t keyboard_position = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -246,6 +273,7 @@ void scanKeysTask(void *argument);
 void displayUpdateTask(void *argument);
 void decode(void *argument);
 void CAN_Transmit(void *argument);
+void handshake(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -266,9 +294,13 @@ uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
 uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 
 void setRow(uint8_t rowIdx);
+void setMuxIO();
 uint8_t readCols();
+
+/*
 uint16_t readKeys();
 uint16_t readKnobs();
+*/
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit, int8_t bottom_limit);
 void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type );
 void choose_wave_gen(uint8_t wave, int table, uint32_t samples);
@@ -348,6 +380,7 @@ int main(void)
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
 
 	serialPrintln("charIOT-Key-C");
+	UID0 = HAL_GetUIDw0();
 
         //Generate initial wave tables
 
@@ -378,10 +411,13 @@ int main(void)
   /* creation of knobsMutex */
   knobsMutexHandle = osMutexNew(&knobsMutex_attributes);
 
+  readMutexHandle = osMutexNew(&readMutex_attributes);
+
   /* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
 	osMutexRelease(keysMutexHandle);
 	osMutexRelease(knobsMutexHandle);
+	osMutexRelease(readMutexHandle);
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -423,6 +459,9 @@ int main(void)
 
   /* creation of CAN_TX_TaskName */
   CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
+
+  /* creation of handshakeTask */
+  handshakeTaskHandle = osThreadNew(handshake, NULL, &handshakeTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -950,7 +989,8 @@ inline void synthesize_waves(int index){
 
     int32_t out = 0;
     uint8_t keys_pressed = 0;
-    int8_t step_octave = (octave >= default_octave) ? 2*(octave - default_octave) : -1; // default octave is 3
+    // Wavetables are generated assuming that the step size is 2.
+    int8_t step_octave = 1 << (octave - 1);
 
     HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
     
@@ -958,7 +998,7 @@ inline void synthesize_waves(int index){
         bool pressed = ~DMAkeys & ( 1 << (t));
 
         if (pressed) {
-            lookup_indices[t] = (lookup_indices[t] + (2+step_octave)) % wavetable_sizes[t];
+            lookup_indices[t] = (lookup_indices[t] + (step_octave)) % wavetable_sizes[t];
             keys_pressed += 1;
             out += lookup_tables[t][lookup_indices[t]];
         }
@@ -1066,7 +1106,7 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
 	HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, bitIdx & 0x04);
 	HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, value);
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
-	delayMicro(2);
+	delayMicro(5);
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
 
 }
@@ -1112,6 +1152,48 @@ uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
 
 }
 
+
+void selectRow(uint8_t rowIdx) {
+    HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(RA0_GPIO_Port, RA0_Pin, rowIdx & 0x01);
+    HAL_GPIO_WritePin(RA1_GPIO_Port, RA1_Pin, rowIdx & 0x02);
+    HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, rowIdx & 0x04);
+}
+
+
+void setMuxIO() {
+
+    uint16_t local_keys = 0;
+    uint16_t local_knobs = 0;
+    bool local_HKIW = 0;
+    bool local_HKIE = 0;
+
+
+    for(int r = 0; r < 7; r++){
+        selectRow(r);
+        HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, outbits[r]);
+        HAL_GPIO_WritePin(REN_GPIO_Port,REN_Pin, GPIO_PIN_SET);
+        delayMicro(5);
+        if( r < 3) {
+            local_keys |= readCols() << (r * 4);
+        } else if (r < 5) {
+            local_knobs |= (readCols() << ((r - 3) * 4));
+        } else if (r == 5) {
+            local_HKIW = readCols() >> 3;
+        } else {
+            local_HKIE = readCols() >> 3;
+        }
+        HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+    }
+
+    __atomic_store_n(&HKIW, local_HKIW, __ATOMIC_RELAXED);
+    __atomic_store_n(&HKIE, local_HKIE, __ATOMIC_RELAXED);
+    __atomic_store_n(&keys, local_keys, __ATOMIC_RELAXED);
+    __atomic_store_n(&knobs, local_knobs, __ATOMIC_RELAXED);
+}
+
+/*
 void setRow(uint8_t rowIdx) {
 
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
@@ -1122,7 +1204,7 @@ void setRow(uint8_t rowIdx) {
 
 	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
 
-}
+}*/
 
 uint8_t readCols() {
 
@@ -1135,37 +1217,48 @@ uint8_t readCols() {
 
 }
 
+/*
 uint16_t readKeys() {
 
+	osMutexAcquire(readMutexHandle, osWaitForever);
 	uint16_t keysRead = 0;
 
 	for (int i = 0; i <= 2; i++) {
 
-		setRow(i);
+		//setRow(i);
+                setOutMuxBit(i, outbits[i]);
 		delayMicro(5);
 		keysRead |= readCols() << (4 * i);
 
 	}
-
+	osMutexRelease(readMutexHandle);
 	return keysRead;
 
 }
 
 uint16_t readKnobs() {
 
+	osMutexAcquire(readMutexHandle, osWaitForever);
 	uint16_t knobsRead = 0;
 
 	for (int i = 3; i <= 4; i++) {
 
-		setRow(i);
+                setOutMuxBit(i, outbits[i]);
 		delayMicro(5);
 		knobsRead |= readCols() << (4 * (i-3));
 
 	}
 
+	for (int i = 5; i < 7; i++) {
+                setOutMuxBit(i, outbits[i]);
+		delayMicro(5);
+	}
+
+	osMutexRelease(readMutexHandle);
+
 	return knobsRead;
 
-}
+}*/
 
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation, int8_t top_limit, int8_t bottom_limit){
 	int16_t rotation = 0;
@@ -1371,7 +1464,8 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
 	/* Infinite loop */
 	for (;;) {
-		osDelay(1);
+		osDelay(100);
+                //serialPrintln("default task");
 	}
   /* USER CODE END 5 */
 }
@@ -1396,8 +1490,9 @@ void scanKeysTask(void *argument)
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
 
-		uint16_t localKeys = readKeys();
-		uint16_t localKnobs = readKnobs();
+                setMuxIO();
+		uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+		uint16_t localKnobs = __atomic_load_n(&knobs, __ATOMIC_RELAXED);
 
 //		char key_s[16];
 //		sprintf(key_s, "%x", localKeys);
@@ -1423,10 +1518,6 @@ void scanKeysTask(void *argument)
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 3, 'v');
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 2, 'o');
 		scanKnob(localKnobs, (uint16_t) prev_knobs, 1, 'w');
-
-		osMutexAcquire(keysMutexHandle, osWaitForever);
-		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
-		osMutexRelease(keysMutexHandle);
 
 //		---------------------------- SEND OVER CAN
 		CAN_MSG_t TX;
@@ -1491,9 +1582,9 @@ void displayUpdateTask(void *argument)
 		}
 //                uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
 
-				char buf[20];
-				sprintf(buf, "%x", RX.Message[1]);
-				serialPrintln(buf);
+                char buf[20];
+                sprintf(buf, "%x", RX.Message[1]);
+                //serialPrintln(buf);
 
 //		PRINTING VOLUME
 		u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  2, "Vol:");
@@ -1550,13 +1641,47 @@ void displayUpdateTask(void *argument)
 void decode(void *argument)
 {
   /* USER CODE BEGIN decode */
-    /* Infinite loop */
-    for (;;) {
-        osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
-        
-        __atomic_store_n(&DMAkeys2, RX.Message[0] | (RX.Message[1] << 8), __ATOMIC_RELAXED);
+	CAN_MSG_t RX;
 
-    }
+	/* Infinite loop */
+	for (;;) {
+
+		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
+
+		if (RX.Message[0] == 'H') {
+
+			keyboard_count += 1;
+
+			// termination (UNTESTED)
+
+			if (RX.Message[1] == 'X') {
+
+				handshakeRequest = 0;	// or osEventFlagsClear
+
+				// write the signals again to check for future disconnections
+                                //
+                                
+                                osMutexAcquire(readMutexHandle, osWaitForever);
+				setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+				setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+                                osMutexRelease(readMutexHandle);
+
+				// HERE, insert code to (re)start everything else
+			}
+
+		}
+
+//		char hexID[3];
+//
+//		sprintf(hexID, "%lX", RX.ID);
+//
+//		u8g2_ClearBuffer(&u8g2);
+//		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+//		u8g2_DrawStr(&u8g2, 2, 10, hexID);
+//		u8g2_DrawStr(&u8g2, 2, 20, (char*) RX.Message);
+//		u8g2_SendBuffer(&u8g2);
+
+	}
   /* USER CODE END decode */
 }
 
@@ -1583,6 +1708,103 @@ void CAN_Transmit(void *argument)
 	}
 
   /* USER CODE END CAN_Transmit */
+}
+
+/* USER CODE BEGIN Header_handshake */
+/**
+ * @brief Function implementing the handshakeTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_handshake */
+void handshake(void *argument)
+{
+  /* USER CODE BEGIN handshake */
+
+	if (handshakeRequest) {	// this could replaced with a flag ?
+            // maybe something like osEventFlagsWait ?
+		// osEventFlagsSet could be called from the task reading user inputs
+
+		// write the outgoing handshaking signals to high
+		
+                /*osMutexAcquire(readMutexHandle, osWaitForever);
+                setOutMuxBit(HKOW_BIT, GPIO_PIN_SET);
+		setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+                osMutexRelease(readMutexHandle);*/
+                outbits[5] = 1;
+                outbits[6] = 1;
+
+    		osDelay(2000);
+
+
+		// read the east-side incoming handshaking signal
+		// the signal is inverted, ie, 0 if there is a keyboard attached
+		// hence, here, only the last keyboard will read high
+		// this is used to terminate the handshaking process
+		
+
+		// the keyboards turn off their east outgoing signal in turn
+		// starting from the leftmost keyboard
+
+		// wait for the west-side handshaking signal to go high
+		while (!HKIW) {
+			osDelay(100);
+		}
+
+		// keyboard_count is incremented at every received CAN message
+		// -> see the decode task
+
+		keyboard_position = keyboard_count - 1;
+                octave = keyboard_position + 3;
+
+		// inform other keyboards
+		// send unique ID and position as per instructions
+
+		CAN_MSG_t TX;
+
+		TX.ID = IDout;
+		TX.Message[0] = 'H';
+		TX.Message[1] = (uint8_t) (UID0 & 0xF000) >> 24;
+		TX.Message[2] = (uint8_t) (UID0 & 0x0F00) >> 16;
+		TX.Message[3] = (uint8_t) (UID0 & 0x00F0) >> 8;
+		TX.Message[4] = (uint8_t) (UID0 & 0x000F);
+		TX.Message[5] = keyboard_position;
+
+		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+		// display the data to check
+
+		char UID0text[8];
+		sprintf(UID0text, "%lX", UID0);
+                serialPrintln(UID0text);
+
+		char posText[2];
+		sprintf(posText, "%i", keyboard_position);
+                serialPrintln(posText);
+
+                /*
+		u8g2_ClearBuffer(&u8g2);
+		u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+		u8g2_DrawStr(&u8g2, 2, 10, UID0text);
+		u8g2_DrawStr(&u8g2, 2, 20, posText);
+		u8g2_SendBuffer(&u8g2);
+                */
+
+		HAL_Delay(100);
+
+		// turn off the east outgoing signal to inform the next keyboard
+
+                //setOutMuxBit(HKOE_BIT, GPIO_PIN_RESET);
+                outbits[6] = 0;
+	}
+
+
+	/* Infinite loop */
+    for(;;){
+        osDelay(1);
+
+    }
+  /* USER CODE END handshake */
 }
 
 /**
