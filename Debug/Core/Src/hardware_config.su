@@ -1,0 +1,11 @@
+../Core/Src/hardware_config.c:19:6:MX_DMA_Init	16	static
+../Core/Src/hardware_config.c:37:6:SystemClock_Config	96	static
+../Core/Src/hardware_config.c:98:6:MX_ADC1_Init	32	static
+../Core/Src/hardware_config.c:156:6:MX_CAN1_Init	8	static
+../Core/Src/hardware_config.c:193:6:MX_DAC1_Init	48	static
+../Core/Src/hardware_config.c:245:6:MX_I2C1_Init	8	static
+../Core/Src/hardware_config.c:297:6:MX_TIM2_Init	40	static
+../Core/Src/hardware_config.c:342:6:MX_TIM6_Init	24	static
+../Core/Src/hardware_config.c:380:6:MX_TIM7_Init	24	static
+../Core/Src/hardware_config.c:418:6:MX_USART2_UART_Init	8	static
+../Core/Src/hardware_config.c:455:6:MX_GPIO_Init	40	static

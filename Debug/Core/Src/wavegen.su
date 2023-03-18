@@ -1,0 +1,6 @@
+../Core/Src/wavegen.c:35:6:init_lookup_tables	16	static
+../Core/Src/wavegen.c:45:6:init_lookup_table	24	static
+../Core/Src/wavegen.c:53:6:generate_waveform	80	static
+../Core/Src/wavegen.c:110:6:set_output_waveform	32	static
+../Core/Src/wavegen.c:126:6:display_wave	16	static
+../Core/Src/wavegen.c:158:13:synthesize_output	56	static
