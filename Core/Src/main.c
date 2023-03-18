@@ -433,15 +433,6 @@ void scanKeysTask(void *argument)
         scanKnob(localKnobs, (uint16_t) prev_knobs, 3, 'v');
         scanKnob(localKnobs, (uint16_t) prev_knobs, 2, 'o');
         scanKnob(localKnobs, (uint16_t) prev_knobs, 1, 'w');
-
-        CAN_MSG_t TX;
-        TX.ID = IDout;
-
-        TX.Message[0] = localKeys & 0x0FF;
-        TX.Message[1] = localKeys >> 8;
-
-        osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
-
     }
 }
 

@@ -42,7 +42,6 @@ extern osMutexId_t readMutexHandle;
 extern uint32_t UID0;
 extern bool handshakeRequest;
 
-extern const uint32_t IDout;
 extern const uint32_t IDin;
 
 extern volatile bool outbits [7];
