@@ -9,3 +9,5 @@
 ../Core/Src/hardware_config.c:380:6:MX_TIM7_Init	24	static
 ../Core/Src/hardware_config.c:418:6:MX_USART2_UART_Init	8	static
 ../Core/Src/hardware_config.c:455:6:MX_GPIO_Init	40	static
+../Core/Src/hardware_config.c:496:9:u8x8_gpio_and_delay	24	static
+../Core/Src/hardware_config.c:501:9:u8x8_byte_i2c	40	static

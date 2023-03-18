@@ -1,0 +1,4 @@
+../Core/Src/cann.c:3:10:setCANFilter	56	static
+../Core/Src/cann.c:21:10:CAN_TX	40	static
+../Core/Src/cann.c:39:10:CAN_CheckRXLevel	0	static
+../Core/Src/cann.c:45:10:CAN_RX	48	static

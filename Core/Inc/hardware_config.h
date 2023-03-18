@@ -1,5 +1,5 @@
 #include "main.h"
-
+#include "csrc/u8g2.h"
 // Device handles
 extern ADC_HandleTypeDef hadc1;
 extern CAN_HandleTypeDef hcan1;
@@ -27,3 +27,6 @@ void MX_DAC1_Init(void);
 void MX_TIM6_Init(void);
 void MX_TIM7_Init(void);
 void MX_TIM2_Init(void);
+
+uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
+uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);

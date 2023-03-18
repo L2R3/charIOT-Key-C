@@ -1,0 +1,6 @@
+../Core/Inc/csrc/u8x8_d_ssd1322.c:123:17:u8x8_ssd1322_4to32.constprop	12	static
+../Core/Inc/csrc/u8x8_d_ssd1322.c:150:9:u8x8_d_ssd1322_common	48	static
+../Core/Inc/csrc/u8x8_d_ssd1322.c:303:9:u8x8_d_ssd1322_nhd_256x64	16	static
+../Core/Inc/csrc/u8x8_d_ssd1322.c:400:9:u8x8_d_ssd1322_240x128	16	static
+../Core/Inc/csrc/u8x8_d_ssd1322.c:439:9:u8x8_d_ssd1322_common2	40	static
+../Core/Inc/csrc/u8x8_d_ssd1322.c:624:9:u8x8_d_ssd1322_nhd_128x64	16	static
