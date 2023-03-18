@@ -352,35 +352,36 @@ int main(void)
 //		}
 
 ////      TRIANGLE WAVES
-//        int half_samples = samples / 2;
-//        int first_fourth = samples / 4;
-//        int third_fourth = half_samples + first_fourth;
-//		for (int i = 0; i < samples; i++) {
-//			lookup_tables[t][i] = (i <= first_fourth) ?
-//									2048 * ((float)(-i) / (float) samples)
-//								:
-//									(i <= third_fourth) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(samples-i) / (float) samples);
-//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
-//			//serialPrintln(buf);
-//		}
-
-////    (SINE over SQUARE) WAVES
         int half_samples = samples / 2;
-        int amp = 8;
+        int first_fourth = samples / 4;
+        int third_fourth = half_samples + first_fourth;
 		for (int i = 0; i < samples; i++) {
-			float harmonic_sample =  sin(2.0 * PI * (float)i / ((float) samples));
-			harmonic_sample += sin(2.0 * PI * (float)i * 3 / ((float) samples)) / 3;
-			harmonic_sample += sin(2.0 * PI * (float)i * 7 / ((float) samples)) / 7;
-			harmonic_sample += sin(2.0 * PI * (float)i * 8 / ((float) samples)) / 8;
-//			harmonic_sample += sin(2.0 * PI * (float)i * 15 / ((float) samples)) / 15;
-//			for(int harmonic = 2; harmonic <= 7 ; harmonic+=2) {
-//				harmonic_sample += sin(2.0 * PI * (float)i * harmonic / ((float) samples)) / harmonic;
-//	        }
-			lookup_tables[t][i] 	= (amp * harmonic_sample);
-			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
-//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+			float wave = (i <= first_fourth) ?
+									2048 * ((float)(-i) / (float) samples)
+								:
+									(i <= third_fourth) ? 2048 * ((float)(i-half_samples) / (float) samples) : 2048 * ((float)(samples-i) / (float) samples);
+			lookup_tables[t][i] = 4*wave;
+			//			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
 			//serialPrintln(buf);
 		}
+
+////    Queen WAVE
+//        int half_samples = samples / 2;
+//        int amp = 8;
+//		for (int i = 0; i < samples; i++) {
+//			float harmonic_sample =  sin(2.0 * PI * (float)i / ((float) samples));
+//			harmonic_sample += sin(2.0 * PI * (float)i * 3 / ((float) samples)) / 3;
+//			harmonic_sample += sin(2.0 * PI * (float)i * 7 / ((float) samples)) / 7;
+//			harmonic_sample += sin(2.0 * PI * (float)i * 8 / ((float) samples)) / 8;
+////			harmonic_sample += sin(2.0 * PI * (float)i * 15 / ((float) samples)) / 15;
+////			for(int harmonic = 2; harmonic <= 7 ; harmonic+=2) {
+////				harmonic_sample += sin(2.0 * PI * (float)i * harmonic / ((float) samples)) / harmonic;
+////	        }
+//			lookup_tables[t][i] 	= (amp * harmonic_sample);
+//			amp += (amp < 2048 || i <= half_samples) ? 40 : -20;
+////			sprintf(buf, "%i %i ", i, lookup_tables[t][i]);
+//			//serialPrintln(buf);
+//		}
 
     }
 
