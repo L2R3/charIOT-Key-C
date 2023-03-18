@@ -406,39 +406,67 @@ int main(void)
 //			lookup_tables[t][i] 	= (2048 * harmonic_sample);
 //		}
 
-//      RETRO WAVES
-        int tone1 = samples*0.2;
-        int tone2 = samples*0.4;
-        int tone3 = samples*0.3;
+//      RETRO WAVE 1
+//		int tone1 = samples*0.2;
+//		int tone2 = samples*0.4;
+//		int tone3 = samples*0.3;
+//		uint32_t curr_samples = 0;
+//		uint32_t step_samples = curr_samples+tone1;
+//		uint32_t half_step_samples = step_samples / 2;
+//
+//		for (int i = curr_samples; i < step_samples; i++) {
+//			float wave =  2048*sin(2.0 * PI * (float)i *5 / ((float) tone1)) /5;
+//			lookup_tables[t][i] = 0.4*wave;
+//		}
+//		curr_samples = step_samples;
+//
+//		step_samples = curr_samples+tone2;
+//		half_step_samples = curr_samples + tone2 / 2;
+//		for (int i = curr_samples; i < step_samples; i++) {
+//			float wave =  2048*sin(2.0 * PI * (float)i / ((float) tone2));
+//			lookup_tables[t][i] = 1*wave;
+//		}
+//		curr_samples = step_samples;
+//
+//		step_samples = curr_samples+tone3;
+//		half_step_samples = curr_samples + tone3 / 2;
+//		for (int i = curr_samples; i < step_samples; i++) {
+//			float wave =  2048*sin(2.0 * PI * (float)i / ((float) tone3));
+//			lookup_tables[t][i] = 0.7*wave;
+//		}
+//		curr_samples = step_samples;
+//
+//		half_step_samples = step_samples + (samples - step_samples) / 2;
+//		for (int i = curr_samples; i < samples; i++) {
+//			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);;
+//			lookup_tables[t][i] = 0.3*wave;
+//		}
+
+//      RETRO WAVE 2
+        int tone1 = samples*0.4;
+        int tone2 = samples*0.3;
         uint32_t curr_samples = 0;
         uint32_t step_samples = curr_samples+tone1;
-        uint32_t half_step_samples = step_samples / 2;
-
+        uint32_t half_step_samples = curr_samples + tone1 / 2;
 		for (int i = curr_samples; i < step_samples; i++) {
-			float wave =  2048*sin(2.0 * PI * (float)i *5 / ((float) tone1)) /5;
-			lookup_tables[t][i] = 0.4*wave;
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+			wave += 2048 * sin(2.0 * PI * (float)i / ((float) tone1));
+			lookup_tables[t][i] = 1*wave;
 		}
 		curr_samples = step_samples;
 
 		step_samples = curr_samples+tone2;
 		half_step_samples = curr_samples + tone2 / 2;
 		for (int i = curr_samples; i < step_samples; i++) {
-			float wave =  2048*sin(2.0 * PI * (float)i / ((float) tone2));
-			lookup_tables[t][i] = 1*wave;
-		}
-		curr_samples = step_samples;
-
-		step_samples = curr_samples+tone3;
-		half_step_samples = curr_samples + tone3 / 2;
-		for (int i = curr_samples; i < step_samples; i++) {
-			float wave =  2048*sin(2.0 * PI * (float)i / ((float) tone3));
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+//			wave += 2048 * sin(2.0 * PI * (float)i / ((float) tone2));
 			lookup_tables[t][i] = 0.7*wave;
 		}
 		curr_samples = step_samples;
 
 		half_step_samples = step_samples + (samples - step_samples) / 2;
 		for (int i = curr_samples; i < samples; i++) {
-			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);;
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
 			lookup_tables[t][i] = 0.3*wave;
 		}
 
