@@ -89,6 +89,7 @@ void serialPrint(char val[]);
 #define RA2_GPIO_Port GPIOB
 #define OUT_Pin GPIO_PIN_5
 #define OUT_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

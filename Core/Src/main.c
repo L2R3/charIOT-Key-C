@@ -13,8 +13,9 @@
 // display
 #include "cmsis_os2.h"
 #include "csrc/u8g2.h"
-#include "stm32l4xx_hal_dac.h"
-#include "stm32l4xx_hal_gpio.h"
+
+//#include "stm32l4xx_hal_dac.h"
+//#include "stm32l4xx_hal_gpio.h"
 
 osMutexId_t readMutexHandle;
 
@@ -146,13 +147,12 @@ int main(void)
     MX_DAC1_Init();
     MX_TIM6_Init();
     MX_TIM7_Init();
-    MX_TIM2_Init();
 
-    HAL_TIM_Base_Start(&htim2);
     HAL_TIM_Base_Start(&htim7);
-    HAL_TIM_Base_Start_IT(&htim6);
+    HAL_TIM_Base_Start(&htim6);
 
-    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)output_wave, OUTPUT_SAMPLES, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t*)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
     //	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
     //	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
@@ -174,7 +174,7 @@ int main(void)
     UID0 = HAL_GetUIDw0();
 
     init_lookup_tables();
-    set_output_waveform(CLARINET);
+    set_output_waveform(SINE);
 
     // Init scheduler
     osKernelInitialize();
@@ -247,6 +247,7 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
     uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
 
     synthesize_output(localKeys, volume, octave, false);
+
 }
 
 

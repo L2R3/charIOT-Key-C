@@ -1,0 +1,5 @@
+wavegen.c:29:6:init_lookup_tables	3
+wavegen.c:41:6:generate_waveform	13
+wavegen.c:117:6:set_output_waveform	3
+wavegen.c:132:6:display_wave	5
+wavegen.c:164:13:synthesize_output	6

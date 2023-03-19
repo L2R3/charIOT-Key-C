@@ -1,0 +1,12 @@
+hardware_config.c:19:6:MX_DMA_Init	1
+hardware_config.c:40:6:SystemClock_Config	4
+hardware_config.c:101:6:MX_ADC1_Init	3
+hardware_config.c:159:6:MX_CAN1_Init	2
+hardware_config.c:196:6:MX_DAC1_Init	4
+hardware_config.c:246:6:MX_I2C1_Init	4
+hardware_config.c:298:6:MX_TIM6_Init	3
+hardware_config.c:336:6:MX_TIM7_Init	3
+hardware_config.c:374:6:MX_USART2_UART_Init	2
+hardware_config.c:411:6:MX_GPIO_Init	1
+hardware_config.c:452:9:u8x8_gpio_and_delay	1
+hardware_config.c:457:9:u8x8_byte_i2c	6
