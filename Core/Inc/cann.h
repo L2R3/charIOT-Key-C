@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include <main.h>
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 
 typedef struct {
 	uint8_t Message[8];
@@ -50,3 +50,7 @@ extern volatile bool HKIW;
 extern volatile bool HKIE;
 
 extern uint16_t octave;
+extern bool selected;
+extern bool controller;
+
+extern uint16_t allKeys[10];

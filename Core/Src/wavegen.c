@@ -1,4 +1,5 @@
 #include "main.h"
+#include "hardware_config.h"
 #include <stddef.h>
 #include <wavegen.h>
 #include <stdint.h>
@@ -14,7 +15,7 @@ int16_t square_table[DDS_LUT_SAMPLES];
 int16_t triangle_table[DDS_LUT_SAMPLES];
 int16_t clarinet_table[DDS_LUT_SAMPLES];
 
-int16_t* DDS_LUT[END_WAVETYPE] = { sawtooth_table, sine_table, square_table,
+int16_t *DDS_LUT[END_WAVETYPE] = { sawtooth_table, sine_table, square_table,
 		triangle_table, clarinet_table };
 int16_t DDS_LUT_SEL[DDS_LUT_SAMPLES];
 
@@ -120,11 +121,14 @@ void set_output_waveform(WaveType wave) {
 	}
 	output_wavetype = wave;
 
-	// replace with M2M DMA if possible
+	// replaced with M2M DMA if possible
 
-	for (int i = 0; i < DDS_LUT_SAMPLES; i++) {
-		DDS_LUT_SEL[i] = DDS_LUT[wave][i];
-	}
+	//	for (int i = 0; i < DDS_LUT_SAMPLES; i++) {
+	//		DDS_LUT_SEL[i] = DDS_LUT[wave][i];
+	//	}
+
+	HAL_DMA_Start_IT(&hdma_memtomem_dma1_channel1, (uint32_t) DDS_LUT[wave],
+			(uint32_t) DDS_LUT_SEL, DDS_LUT_SAMPLES);
 
 }
 
@@ -174,22 +178,30 @@ bool first_half) {
 	}
 
 	// determine which keys are pressed
-	bool keys_pressed[12];
-	for (int k = 0; k < 12; k++) {
-		keys_pressed[k] = ~keys & (1 << (k));
-	}
+//	bool keys_pressed[12];
+//	for (int k = 0; k < 12; k++) {
+//		keys_pressed[k] = ~keys & (1 << (k));
+//	}
+
+	bool key_pressed;
 
 	// synthesise the waveform by addition
 	for (int i = sample_begin; i < sample_end; i++) {
 
 		int32_t out = 0;
 
-		for (int t = 0; t < 12; t++) {
+		for (int k = 0; k < keyboard_count; k++) {
 
-			if (keys_pressed[t]) {
-				DDS_indices[t] += DDS_steps[t];
-				out += DDS_LUT_SEL[DDS_indices[t] >> 6];
+			for (int t = 0; t < 12; t++) {
+
+				key_pressed = ~(allKeys[k]) & (1 << t);
+
+				if (key_pressed) {
+					DDS_indices[t] += DDS_steps[t] << (k-keyboard_position);
+					out += DDS_LUT_SEL[DDS_indices[t] >> 6];
+				}
 			}
+
 		}
 
 		DDS_OUT[i] = ((uint16_t) (out >> (12 - volume))) + 2048;

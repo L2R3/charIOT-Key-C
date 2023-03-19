@@ -15,6 +15,8 @@ extern TIM_HandleTypeDef htim7;
 
 extern UART_HandleTypeDef huart2;
 
+extern DMA_HandleTypeDef hdma_memtomem_dma1_channel1;
+
 // Device configuration functions
 void SystemClock_Config(void);
 void MX_GPIO_Init(void);

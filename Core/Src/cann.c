@@ -1,6 +1,5 @@
 #include "cann.h"
 
-
 osSemaphoreId_t CAN_TX_SemaphoreHandle;
 
 osMessageQueueId_t msgInQHandle;
@@ -36,13 +35,31 @@ void decode(void *argument)
 
                 // write the signals again to check for future disconnections
                 
-                osMutexAcquire(readMutexHandle, osWaitForever);
-                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
-                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
-                osMutexRelease(readMutexHandle);
+//                osMutexAcquire(readMutexHandle, osWaitForever);
+//                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+//                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
+//                osMutexRelease(readMutexHandle);
+
+                outbits[5] = 1;
+                outbits[6] = 1;
 
                 // HERE, insert code to (re)start everything else
+
             }
+        }
+
+        if (RX.Message[0] == 'C') {
+
+        	octave = 4+keyboard_position-RX.Message[1];
+
+        }
+
+        if (RX.Message[0] == 'K') {
+
+        	uint16_t localKeys = (uint16_t) RX.Message[2] << 8 | RX.Message[1];
+
+        	allKeys[RX.Message[3]] = localKeys;
+
         }
     }
 }
@@ -59,6 +76,7 @@ void CAN_Transmit(void *argument)
 
 void handshake(void *argument)
 {
+
     if (handshakeRequest) {	
         // this could replaced with a flag ?
         // maybe something like osEventFlagsWait ?
@@ -70,7 +88,6 @@ void handshake(void *argument)
 
         osDelay(2000);
 
-
         // read the east-side incoming handshaking signal
         // the signal is inverted, ie, 0 if there is a keyboard attached
         // hence, here, only the last keyboard will read high
@@ -81,13 +98,13 @@ void handshake(void *argument)
 
         // wait for the west-side handshaking signal to go high
         while (!HKIW) {
-                osDelay(100);
+        	osDelay(100);
         }
 
         // keyboard_count is incremented at every received CAN message
         // -> see the decode task
         keyboard_position = keyboard_count - 1;
-        octave = keyboard_position + 3;
+        octave = keyboard_position + 4;
 
         // inform other keyboards
         // send unique ID and position as per instructions
@@ -105,28 +122,47 @@ void handshake(void *argument)
         osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
         // display the data to check
-        char UID0text[8];
-        sprintf(UID0text, "%lX", UID0);
+//        char UID0text[8];
+//        sprintf(UID0text, "%lX", UID0);
         //serialPrintln(UID0text);
 
-        char posText[2];
-        sprintf(posText, "%i", keyboard_position);
+//        char posText[2];
+//        sprintf(posText, "%i", keyboard_position);
         //serialPrintln(posText);
 
-        HAL_Delay(100);
+        osDelay(100);
 
         // turn off the east outgoing signal to inform the next keyboard
 
         outbits[6] = 0;
+
     }
 
+    const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;){
-        osDelay(1);
+
+    	vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+    	if (selected) {
+
+    		controller = 1;
+
+    		CAN_MSG_t TX;
+    		TX.ID = 0x123;
+    		TX.Message[0] = 'C';
+    		TX.Message[1] = keyboard_position;
+
+    		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+    		octave = 4;
+
+    	}
+
     }
+
 }
-
-
 
 
 uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank) {

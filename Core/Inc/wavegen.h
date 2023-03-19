@@ -29,3 +29,6 @@ void synthesize_waves(int index);
 
 extern WaveType output_wavetype;
 extern uint16_t DDS_OUT[DDS_OUT_SAMPLES];
+extern uint16_t allKeys[10];
+extern uint8_t keyboard_count;
+extern uint8_t keyboard_position;
