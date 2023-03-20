@@ -159,7 +159,7 @@ void handshake(void *argument)
 
 				octave = 4;
     		}
-    		osDelay(500);
+    		vTaskDelay(500);
     	}
 
 
