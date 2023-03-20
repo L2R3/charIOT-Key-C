@@ -99,7 +99,7 @@ const osEventFlagsAttr_t outputFlag_attributes = {
 uint32_t DMAkeys;
 uint32_t DMAkeys2;
 
-uint16_t allKeys[10];
+uint16_t allKeys[MAX_KEYBOARDS];
 
 volatile bool outbits [7] = {1, 1, 1, 1, 1, 1, 1};  
 
@@ -427,10 +427,20 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char 
 void StartDefaultTask(void *argument)
 {
     for (;;) {
-        osDelay(100);
+        vTaskDelay(1000);
         char buf[20];
-        sprintf(buf, "type: %i", output_wavetype);
-        //serialPrintln(buf);
+
+        uint8_t notes_played [12];
+
+        for (int key = 0; key < 12; key++) {
+            notes_played[key] = 0;
+            for (int board = 0; board < keyboard_count; board++) {
+                notes_played[key] |= ((~(allKeys[board]) >> key) & 1) << board;
+            }
+            sprintf(buf, "%i, %x", key, notes_played[key]);
+            serialPrintln(buf);
+        }
+        serialPrintln("\n\n");
     }
 }
 

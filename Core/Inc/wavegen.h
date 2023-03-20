@@ -8,8 +8,12 @@
 
 #include <main.h>
 
+#ifndef WAVEGEN_H
+#define WAVEGEN_H
+
 #define DDS_LUT_SAMPLES 1024
-#define DDS_OUT_SAMPLES 2048
+#define DDS_OUT_SAMPLES 8192
+#define MAX_KEYBOARDS 8
 
 typedef enum {
     SAWTOOTH = 0,
@@ -31,7 +35,9 @@ void synthesize_waves(int index);
 
 extern WaveType output_wavetype;
 extern uint16_t DDS_OUT[DDS_OUT_SAMPLES];
-extern uint16_t allKeys[10];
-extern uint8_t keyboard_count;
-extern uint8_t keyboard_position;
+extern uint16_t allKeys[MAX_KEYBOARDS];
+extern volatile uint8_t keyboard_count;
+extern volatile uint8_t keyboard_position;
 extern osEventFlagsId_t outputFlagHandle;
+
+#endif

@@ -4,7 +4,11 @@
 #include <stdio.h>
 
 #include <main.h>
+#include "wavegen.h"
 #include "cmsis_os.h"
+
+#ifndef CAN_H
+#define CAN_H
 
 typedef struct {
 	uint8_t Message[8];
@@ -59,4 +63,6 @@ extern uint16_t octave;
 extern bool selected;
 extern bool controller;
 
-extern uint16_t allKeys[10];
+extern uint16_t allKeys[MAX_KEYBOARDS];
+
+#endif

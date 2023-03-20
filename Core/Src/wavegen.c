@@ -254,34 +254,46 @@ inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, boo
     //		keys_pressed[k] = ~keys & (1 << (k));
     //	}
 
-    bool key_pressed;
+    /*
+    bool keys_pressed [MAX_KEYBOARDS * 12];
+
+    for (int key = 0; key < 12; key++) {
+        for (int k = 0; k < MAX_KEYBOARDS * 12; k++) {
+            keys_pressed[k] = ~(allKeys[k]) & (1 << key);
+        }
+    }*/
+
+    uint8_t notes_played [12];
+
+    for (int key = 0; key < 12; key++) {
+        notes_played[key] = 0;
+        for (int board = 0; board < keyboard_count; board++) {
+            notes_played[key] |= ((~(allKeys[board]) >> key) & 1) << board;
+        }
+    }
+
+    
+
 
     // synthesise the waveform by addition
     for (int i = sample_begin; i < sample_end; i++)
     {
-
-        for (int k = 0; k < 12; k++)
-        {
-            DDS_indices[k] += DDS_steps[k];
-        }
-
         int32_t out = 0;
 
-        for (int k = 0; k < keyboard_count; k++)
-        {
+        for (int key = 0; key < 12; key++){
+            if(notes_played[key]) {
 
-            for (int t = 0; t < 12; t++)
-            {
+                DDS_indices[key] += DDS_steps[key];
+                for (int board = 0; board < keyboard_count; board++){
 
-                key_pressed = ~(allKeys[k]) & (1 << t);
-
-                if (key_pressed)
-                {
-                    out += DDS_LUT_SEL[(DDS_indices[t] >> (13 - k + keyboard_position - octave)) & 0x03FF];
+                    if(notes_played[key] & (1 << board)){
+                        out += DDS_LUT_SEL[(DDS_indices[key] >> (13 - board + keyboard_position - octave)) & 0x03FF];
+                    }
                 }
             }
         }
 
         DDS_OUT[i] = ((uint16_t)(out >> (12 - volume))) + 2048;
+        //DDS_OUT[i] = 0;
     }
 }

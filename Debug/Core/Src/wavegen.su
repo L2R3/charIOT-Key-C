@@ -2,4 +2,4 @@
 ../Core/Src/wavegen.c:37:6:generate_waveform	176	static
 ../Core/Src/wavegen.c:172:6:set_output_waveform	16	static
 ../Core/Src/wavegen.c:190:6:display_wave	16	static
-../Core/Src/wavegen.c:235:13:synthesize_output	48	static
+../Core/Src/wavegen.c:235:13:synthesize_output	64	static
