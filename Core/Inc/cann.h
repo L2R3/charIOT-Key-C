@@ -26,6 +26,8 @@ typedef enum {
     // Map each enum to a relevant ASCII char for easy debugging
     HANDSHAKE = 'H',
     TERMINATE = 'X',
+    OCTAVE_CHANGE = 'O',
+    KEYS = 'K',
 } CannMsgType;
 
 void decode(void *argument);
@@ -61,7 +63,7 @@ extern volatile bool HKIE;
 
 extern uint16_t octave;
 extern bool selected;
-extern bool controller;
+extern bool is_receiver;
 
 extern uint16_t allKeys[MAX_KEYBOARDS];
 

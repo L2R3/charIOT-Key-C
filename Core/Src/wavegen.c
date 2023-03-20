@@ -25,7 +25,7 @@ void init_lookup_tables()
 
     for (int t = 0; t < 12; t++)
     {
-        DDS_steps[t] = 3520 * pow(2, (t - 9) / 12.0) / 44100 * 65536;
+        DDS_steps[t] = 3520.0 * pow(2, (t - 9) / 12.0) / 44100 * 65536.0;
     }
 
     for (WaveType type = 0; type < END_WAVETYPE; type++)
@@ -234,7 +234,6 @@ void display_wave(u8g2_t *u8g2, uint16_t x, uint16_t y)
 
 inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, bool first_half)
 {
-
     // determine which half needs to be filled
     int sample_begin, sample_end;
     if (first_half)
@@ -248,21 +247,7 @@ inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, boo
         sample_end = DDS_OUT_SAMPLES;
     }
 
-    // determine which keys are pressed
-    //	bool keys_pressed[12];
-    //	for (int k = 0; k < 12; k++) {
-    //		keys_pressed[k] = ~keys & (1 << (k));
-    //	}
-
-    /*
-    bool keys_pressed [MAX_KEYBOARDS * 12];
-
-    for (int key = 0; key < 12; key++) {
-        for (int k = 0; k < MAX_KEYBOARDS * 12; k++) {
-            keys_pressed[k] = ~(allKeys[k]) & (1 << key);
-        }
-    }*/
-
+    // TODO: Move this into scanKeys or similar. Add a semaphore to access notes_played/allKeys;
     uint8_t notes_played [12];
 
     for (int key = 0; key < 12; key++) {
@@ -271,9 +256,6 @@ inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, boo
             notes_played[key] |= ((~(allKeys[board]) >> key) & 1) << board;
         }
     }
-
-    
-
 
     // synthesise the waveform by addition
     for (int i = sample_begin; i < sample_end; i++)

@@ -12,7 +12,7 @@
 #define WAVEGEN_H
 
 #define DDS_LUT_SAMPLES 1024
-#define DDS_OUT_SAMPLES 8192
+#define DDS_OUT_SAMPLES 4096
 #define MAX_KEYBOARDS 8
 
 typedef enum {

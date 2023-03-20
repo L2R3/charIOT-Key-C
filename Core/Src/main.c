@@ -1,14 +1,14 @@
 #include "main.h"
-#include "cmsis_os2.h"
-#include "wavegen.h"
-#include "cmsis_os.h"
-#include "hardware_config.h"
 #include "cann.h"
+#include "cmsis_os.h"
+#include "cmsis_os2.h"
+#include "hardware_config.h"
+#include "wavegen.h"
 
 #include <math.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 // display
@@ -16,92 +16,83 @@
 
 osMutexId_t readMutexHandle;
 
-volatile bool outbits [7];
+volatile bool outbits[7];
 
-bool controller = 0;
+bool is_receiver = 0;
 
 bool selected = 0;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+    .name = "defaultTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for scanKeys */
 osThreadId_t scanKeysHandle;
 const osThreadAttr_t scanKeys_attributes = {
-  .name = "scanKeys",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityBelowNormal,
+    .name = "scanKeys",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityBelowNormal,
 };
 /* Definitions for displayUpdate */
 osThreadId_t displayUpdateHandle;
 const osThreadAttr_t displayUpdate_attributes = {
-  .name = "displayUpdate",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+    .name = "displayUpdate",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityLow,
 };
 /* Definitions for decodeTask */
 osThreadId_t decodeTaskHandle;
 const osThreadAttr_t decodeTask_attributes = {
-  .name = "decodeTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+    .name = "decodeTask",
+    .stack_size = 256 * 4,
+    .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for CAN_TX_TaskName */
 osThreadId_t CAN_TX_TaskNameHandle;
 const osThreadAttr_t CAN_TX_TaskName_attributes = {
-  .name = "CAN_TX_TaskName",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+    .name = "CAN_TX_TaskName",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityLow,
 };
 /* Definitions for handshakeTask */
 osThreadId_t handshakeTaskHandle;
 const osThreadAttr_t handshakeTask_attributes = {
-  .name = "handshakeTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+    .name = "handshakeTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityHigh,
 };
 /* Definitions for OutputTask */
 osThreadId_t OutputTaskFirstHalfHandle;
 osThreadId_t OutputTaskSecondHalfHandle;
 const osThreadAttr_t OutputTask_attributes = {
-  .name = "OutputTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
+    .name = "OutputTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityRealtime,
 };
-
 
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
-const osMutexAttr_t keysMutex_attributes = {
-  .name = "keysMutex"
-};
+const osMutexAttr_t keysMutex_attributes = {.name = "keysMutex"};
 /* Definitions for knobsMutex */
 osMutexId_t knobsMutexHandle;
-const osMutexAttr_t knobsMutex_attributes = {
-  .name = "knobsMutex"
-};
+const osMutexAttr_t knobsMutex_attributes = {.name = "knobsMutex"};
 
 /* Definitions for read mutex */
 osMutexId_t readMutexHandle;
-const osMutexAttr_t readMutex_attributes = {
-  .name = "readMutex"
-};
+const osMutexAttr_t readMutex_attributes = {.name = "readMutex"};
 /* Definitions for outputFlag */
 osEventFlagsId_t outputFlagHandle;
-const osEventFlagsAttr_t outputFlag_attributes = {
-  .name = "outputFlag"
-};
+const osEventFlagsAttr_t outputFlag_attributes = {.name = "outputFlag"};
 
 uint32_t DMAkeys;
 uint32_t DMAkeys2;
 
 uint16_t allKeys[MAX_KEYBOARDS];
 
-volatile bool outbits [7] = {1, 1, 1, 1, 1, 1, 1};  
+volatile bool outbits[7] = {1, 1, 1, 1, 1, 1, 1};
 
 u8g2_t u8g2;
 CanMsg_t RX;
@@ -115,16 +106,8 @@ uint16_t volume = 8;
 uint16_t octave = 4;
 uint16_t default_octave = 4;
 
-const char* keyNotes[12] = {
-  "Do", "Do#",
-  "Re", "Re#",
-  "Mi",
-  "Fa", "Fa#",
-  "Sol", "Sol#",
-  "La", "La#",
-  "Si"
-};
-char* notesPressed[12] = {'-','-','-','-','-','-','-','-','-','-','-','-'};
+const char *keyNotes[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
+char *notesPressed[12] = {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'};
 
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
@@ -135,15 +118,15 @@ void serialPrintln(char val[]);
 void delayMicro(uint16_t us);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value);
-uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
-		void *arg_ptr);
+uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 
 void setMuxIO();
 uint8_t readCols();
 
-int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit, int8_t bottom_limit);
-void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type );
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit,
+                        int8_t bottom_limit);
+void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type);
 void fill_output_first_half();
 void fill_output_second_half();
 
@@ -169,8 +152,8 @@ int main(void)
     HAL_TIM_Base_Start(&htim7);
     HAL_TIM_Base_Start(&htim6);
 
-    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
-    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t*)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
     //	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
     //	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 
@@ -217,8 +200,8 @@ int main(void)
     // Create queues
     const osMessageQueueAttr_t msgInQ_attributes = {.name = "msgInQ"};
     const osMessageQueueAttr_t msgOutQ_attributes = {.name = "msgOutQ"};
-    msgInQHandle = osMessageQueueNew (36, sizeof(CanMsg_t), &msgInQ_attributes);
-    msgOutQHandle = osMessageQueueNew (36, sizeof(CanMsg_t), &msgOutQ_attributes);
+    msgInQHandle = osMessageQueueNew(36, sizeof(CanMsg_t), &msgInQ_attributes);
+    msgOutQHandle = osMessageQueueNew(36, sizeof(CanMsg_t), &msgOutQ_attributes);
 
     // Create threads
     defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
@@ -237,38 +220,42 @@ int main(void)
     osKernelStart();
 }
 
-
-
-void serialPrint(char val[]) {
-    HAL_UART_Transmit(&huart2, (uint8_t*) val, strlen(val), 10);
+void serialPrint(char val[])
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)val, strlen(val), 10);
 }
 
-void serialPrintln(char val[]) {
-    HAL_UART_Transmit(&huart2, (uint8_t*) val, strlen(val), 10);
+void serialPrintln(char val[])
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)val, strlen(val), 10);
     char rn[2] = "\r\n";
-    HAL_UART_Transmit(&huart2, (uint8_t*) rn, 2, 10);
+    HAL_UART_Transmit(&huart2, (uint8_t *)rn, 2, 10);
 }
 
-void delayMicro(uint16_t us) {
+void delayMicro(uint16_t us)
+{
     htim7.Instance->CNT = 0;
     while (htim7.Instance->CNT < us)
-            ;
+        ;
 }
 
 /// Task to fill the first half of the DMA output buffer
-void fill_output_first_half() {
+void fill_output_first_half()
+{
 
-    for (;;) {
+    for (;;)
+    {
         osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
         HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
         synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, true);
         HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
     }
-
 }
 
-void fill_output_second_half() {
-    for (;;) {
+void fill_output_second_half()
+{
+    for (;;)
+    {
         osEventFlagsWait(outputFlagHandle, 0x2, osFlagsWaitAny, osWaitForever);
         HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
         synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, false);
@@ -276,30 +263,31 @@ void fill_output_second_half() {
     }
 }
 
-
-void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
-    osEventFlagsSet(outputFlagHandle, 0x1); 
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac)
+{
+    osEventFlagsSet(outputFlagHandle, 0x1);
 }
 
-void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
-    osEventFlagsSet(outputFlagHandle, 0x2); 
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
+{
+    osEventFlagsSet(outputFlagHandle, 0x2);
 }
 
+void setOutMuxBit(const uint8_t bitIdx, const bool value)
+{
 
-void setOutMuxBit(const uint8_t bitIdx, const bool value) {
-
-	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(RA0_GPIO_Port, RA0_Pin, bitIdx & 0x01);
-	HAL_GPIO_WritePin(RA1_GPIO_Port, RA1_Pin, bitIdx & 0x02);
-	HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, bitIdx & 0x04);
-	HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, value);
-	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
-	delayMicro(5);
-	HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
-
+    HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(RA0_GPIO_Port, RA0_Pin, bitIdx & 0x01);
+    HAL_GPIO_WritePin(RA1_GPIO_Port, RA1_Pin, bitIdx & 0x02);
+    HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, bitIdx & 0x04);
+    HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, value);
+    HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
+    delayMicro(5);
+    HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
 }
 
-void selectRow(uint8_t rowIdx) {
+void selectRow(uint8_t rowIdx)
+{
     HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
 
     HAL_GPIO_WritePin(RA0_GPIO_Port, RA0_Pin, rowIdx & 0x01);
@@ -307,27 +295,34 @@ void selectRow(uint8_t rowIdx) {
     HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, rowIdx & 0x04);
 }
 
-
-void setMuxIO() {
+void setMuxIO()
+{
 
     uint16_t local_keys = 0;
     uint16_t local_knobs = 0;
     bool local_HKIW = 0;
     bool local_HKIE = 0;
 
-
-    for(int r = 0; r < 7; r++){
+    for (int r = 0; r < 7; r++)
+    {
         selectRow(r);
         HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, outbits[r]);
-        HAL_GPIO_WritePin(REN_GPIO_Port,REN_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
         delayMicro(5);
-        if( r < 3) {
+        if (r < 3)
+        {
             local_keys |= readCols() << (r * 4);
-        } else if (r < 5) {
+        }
+        else if (r < 5)
+        {
             local_knobs |= (readCols() << ((r - 3) * 4));
-        } else if (r == 5) {
+        }
+        else if (r == 5)
+        {
             local_HKIW = readCols() >> 3;
-        } else {
+        }
+        else
+        {
             local_HKIE = readCols() >> 3;
             selected = ~readCols() & 0x01;
         }
@@ -338,98 +333,106 @@ void setMuxIO() {
     __atomic_store_n(&HKIE, local_HKIE, __ATOMIC_RELAXED);
     __atomic_store_n(&keys, local_keys, __ATOMIC_RELAXED);
     __atomic_store_n(&knobs, local_knobs, __ATOMIC_RELAXED);
-
 }
 
-uint8_t readCols() {
+uint8_t readCols()
+{
 
-	uint8_t C0_val = HAL_GPIO_ReadPin(C0_GPIO_Port, C0_Pin);
-	uint8_t C1_val = HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin);
-	uint8_t C2_val = HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin);
-	uint8_t C3_val = HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin);
+    uint8_t C0_val = HAL_GPIO_ReadPin(C0_GPIO_Port, C0_Pin);
+    uint8_t C1_val = HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin);
+    uint8_t C2_val = HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin);
+    uint8_t C3_val = HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin);
 
-	return (C3_val << 3) | (C2_val << 2) | (C1_val << 1) | C0_val;
-
+    return (C3_val << 3) | (C2_val << 2) | (C1_val << 1) | C0_val;
 }
 
-
-int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation, int8_t top_limit, int8_t bottom_limit){
+int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t knobRotation, int8_t top_limit,
+                        int8_t bottom_limit)
+{
     int16_t rotation = 0;
     int current_knob = knob_state;
     int prev_knob = previousKnobState;
 
     // upper and bottom levels for knob
-    if ((((prev_knob == 0b11) && (current_knob == 0b10)) ||
-      ((prev_knob == 0b00) && (current_knob == 0b01))) &&
-            knobRotation < top_limit
-    ){
-        rotation ++;
-    } else
-        if ((((prev_knob == 0b01) && (current_knob == 0b00)) ||
-           ((prev_knob == 0b10) && (current_knob == 0b11))) &&
-                 knobRotation > bottom_limit
-        ) {
-        rotation --;
+    if ((((prev_knob == 0b11) && (current_knob == 0b10)) || ((prev_knob == 0b00) && (current_knob == 0b01))) &&
+        knobRotation < top_limit)
+    {
+        rotation++;
+    }
+    else if ((((prev_knob == 0b01) && (current_knob == 0b00)) || ((prev_knob == 0b10) && (current_knob == 0b11))) &&
+             knobRotation > bottom_limit)
+    {
+        rotation--;
     }
 
     return rotation;
 }
 
-void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char type ) {
-	uint8_t shift_row = (knob_index >= 2) ? 0 : 4;
-	uint8_t row = 0xF;
-	uint8_t knob_on_row = 1 - knob_index % 2;
+void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char type)
+{
+    uint8_t shift_row = (knob_index >= 2) ? 0 : 4;
+    uint8_t row = 0xF;
+    uint8_t knob_on_row = 1 - knob_index % 2;
 
-	uint8_t rowKnobStates 	  = (localKnobs 	 >> shift_row) & row;
-	uint8_t rowPrevKnobStates = (prevKnobs >> shift_row) & row;
+    uint8_t rowKnobStates = (localKnobs >> shift_row) & row;
+    uint8_t rowPrevKnobStates = (prevKnobs >> shift_row) & row;
 
-//	char s[32];
-//	sprintf(s, "rowKnobStates:%x", rowKnobStates);
-//	serialPrintln(s);
+    //	char s[32];
+    //	sprintf(s, "rowKnobStates:%x", rowKnobStates);
+    //	serialPrintln(s);
 
-	uint8_t knobState		  = (rowKnobStates 	   >> knob_on_row*2) & 0b11;
-	uint8_t previousKnobState = (rowPrevKnobStates >> knob_on_row*2) & 0b11;
+    uint8_t knobState = (rowKnobStates >> knob_on_row * 2) & 0b11;
+    uint8_t previousKnobState = (rowPrevKnobStates >> knob_on_row * 2) & 0b11;
 
+    //	UPDATE GLOBAL VARIABLES
+    osMutexAcquire(knobsMutexHandle, osWaitForever);
+    __atomic_store_n(&knobs, localKnobs, __ATOMIC_RELAXED);
+    osMutexRelease(knobsMutexHandle);
 
-//	UPDATE GLOBAL VARIABLES
-	osMutexAcquire(knobsMutexHandle, osWaitForever);
-	__atomic_store_n(&knobs, localKnobs, __ATOMIC_RELAXED);
-	osMutexRelease(knobsMutexHandle);
+    if (previousKnobState != knobState)
+    {
+        osMutexAcquire(knobsMutexHandle, osWaitForever);
+        __atomic_store_n(&prev_knobs, localKnobs, __ATOMIC_RELAXED);
+        osMutexRelease(knobsMutexHandle);
 
-	if (previousKnobState != knobState) {
-		osMutexAcquire(knobsMutexHandle, osWaitForever);
-		__atomic_store_n(&prev_knobs, localKnobs, __ATOMIC_RELAXED);
-		osMutexRelease(knobsMutexHandle);
+        if (type == 'v')
+        {
+            int16_t change_volume = changeKnobState(knobState, previousKnobState, volume, 12, 0);
+            volume = volume + change_volume;
 
-		if (type == 'v'){
-			int16_t change_volume = changeKnobState(knobState, previousKnobState, volume, 12, 0);
-			volume = volume + change_volume;
-		//	sprintf(s, "volume: %d", volume);
-		//	serialPrintln(s);
-		} else if (type == 'o'){
-			int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8, 2); // can only go one lower than the default octave
-			octave = octave + change_octave;
-			//	sprintf(s, "octave: %d", octave);
-			//	serialPrintln(s);
-		} else if (type == 'w'){
-			int16_t change_wave = changeKnobState(knobState, previousKnobState, output_wavetype, END_WAVETYPE-1, 0);
-			WaveType new_wavetype = (output_wavetype + change_wave) % END_WAVETYPE;
-			//	sprintf(s, "wave_form: %d", wave_form);
-			//	serialPrintln(s);
-			//
-			set_output_waveform(new_wavetype);
-		}
-	}
+            //	sprintf(s, "volume: %d", volume);
+            //	serialPrintln(s);
+        }
+        else if (type == 'o')
+        {
+            int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8,
+                                                    2); // can only go one lower than the default octave
+            octave = octave + change_octave;
 
+            CanMsg_t TX;
+            TX.ID = 0x123;
+            TX.Message[0] = OCTAVE_CHANGE;
+            TX.Message[1] = keyboard_position;
+            TX.Message[2] = octave;
+            osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+        }
+        else if (type == 'w')
+        {
+            int16_t change_wave = changeKnobState(knobState, previousKnobState, output_wavetype, END_WAVETYPE - 1, 0);
+            WaveType new_wavetype = (output_wavetype + change_wave) % END_WAVETYPE;
+            set_output_waveform(new_wavetype);
+        }
+    }
 }
-
 
 void StartDefaultTask(void *argument)
 {
-    for (;;) {
+    for (;;)
+    {
         vTaskDelay(1000);
         char buf[20];
 
+        /*
         uint8_t notes_played [12];
 
         for (int key = 0; key < 12; key++) {
@@ -441,6 +444,7 @@ void StartDefaultTask(void *argument)
             serialPrintln(buf);
         }
         serialPrintln("\n\n");
+        */
     }
 }
 
@@ -450,7 +454,8 @@ void scanKeysTask(void *argument)
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     /* Infinite loop */
-    for (;;) {
+    for (;;)
+    {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         setMuxIO();
@@ -459,49 +464,49 @@ void scanKeysTask(void *argument)
 
         allKeys[keyboard_position] = localKeys;
 
-        //char key_s[16];
-        //sprintf(key_s, "%x", localKeys);
-        //char knobs_s[16];
-        //sprintf(knobs_s, "%x", localKnobs);
+        // char key_s[16];
+        // sprintf(key_s, "%x", localKeys);
+        // char knobs_s[16];
+        // sprintf(knobs_s, "%x", localKnobs);
         //
-        //serialPrint("keys: ");
-        //serialPrintln(key_s);
-        //serialPrint("knobs: ");
-        //serialPrintln(knobs_s);
+        // serialPrint("keys: ");
+        // serialPrintln(key_s);
+        // serialPrint("knobs: ");
+        // serialPrintln(knobs_s);
         uint8_t keys_pressed = 0;
-        for (int t = 0; t < 12; t++){
-                bool pressed = ~localKeys & ( 1 << (t));
+        for (int t = 0; t < 12; t++)
+        {
+            bool pressed = ~localKeys & (1 << (t));
 
-                if (pressed) {
-                        notesPressed[t] = keyNotes[t];
-                        keys_pressed += 1;
-                } else {
-                        notesPressed[t] = '-';
-                }
+            if (pressed)
+            {
+                notesPressed[t] = keyNotes[t];
+                keys_pressed += 1;
+            }
+            else
+            {
+                notesPressed[t] = '-';
+            }
         }
 
-        scanKnob(localKnobs, (uint16_t) prev_knobs, 3, 'v');
-        scanKnob(localKnobs, (uint16_t) prev_knobs, 2, 'o');
-        scanKnob(localKnobs, (uint16_t) prev_knobs, 1, 'w');
+        scanKnob(localKnobs, (uint16_t)prev_knobs, 3, 'v');
+        scanKnob(localKnobs, (uint16_t)prev_knobs, 2, 'o');
+        scanKnob(localKnobs, (uint16_t)prev_knobs, 1, 'w');
 
-        // not working, how do we actually set volume ???
-        if (!controller) {
-        	volume = 0;
+        if (!is_receiver)
+        {
+            volume = 0;
         }
-//        else {
-//        	volume = 0;
-//    	}
 
         CanMsg_t TX;
 
         TX.ID = 0x123;
         TX.Message[0] = 'K';
-        TX.Message[1] = (uint8_t) (localKeys & 0x00FF);
-        TX.Message[2] = (uint8_t) ((localKeys & 0xFF00) >> 8);
-        TX.Message[3] = (uint8_t) keyboard_position;
+        TX.Message[1] = (uint8_t)(localKeys & 0x00FF);
+        TX.Message[2] = (uint8_t)((localKeys & 0xFF00) >> 8);
+        TX.Message[3] = (uint8_t)keyboard_position;
 
         osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
-
     }
 }
 
@@ -511,7 +516,8 @@ void displayUpdateTask(void *argument)
     const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    for (;;) {
+    for (;;)
+    {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         osMutexAcquire(keysMutexHandle, osWaitForever);
@@ -524,116 +530,125 @@ void displayUpdateTask(void *argument)
         u8g2_ClearBuffer(&u8g2);
         u8g2_SetFont(&u8g2, u8g2_font_new3x9pixelfont_tr);
 
-        //PRINTING THE NOTES PRESSED
+        // PRINTING THE NOTES PRESSED
         uint8_t string_size = 2;
         uint8_t space = 3;
-//        char o_s[16];
-//        sprintf(o_s, "|%x|", controller);
-//        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
-        if (controller){
-        	u8g2_DrawStr(&u8g2, string_size, 7, "|rcv|");
-        } else {
-        	u8g2_DrawStr(&u8g2, string_size, 7, "|snd|");
+        //        char o_s[16];
+        //        sprintf(o_s, "|%x|", controller);
+        //        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
+        if (is_receiver)
+        {
+            u8g2_DrawStr(&u8g2, string_size, 7, "|rcv|");
+        }
+        else
+        {
+            u8g2_DrawStr(&u8g2, string_size, 7, "|snd|");
         }
 
-        if (!controller){
-        	u8g2_SetDrawColor(&u8g2, 1);
-        	u8g2_SetBitmapMode(&u8g2, 0);
-        	u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2)-35*2,  2,  1, "Knob 0 to receive" );
+        if (!is_receiver)
+        {
+            u8g2_SetDrawColor(&u8g2, 1);
+            u8g2_SetBitmapMode(&u8g2, 0);
+            u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2) - 35 * 2, 2, 1,
+                                "Knob 0 to receive");
         }
         string_size += 19;
 
-        for (int t = 0; t < 12; t++){
-                if (notesPressed[t] != '-') {
-                        uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
-                        u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);
-                        string_size += w + space;
-                }
+        for (int t = 0; t < 12; t++)
+        {
+            if (notesPressed[t] != '-')
+            {
+                uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
+                u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);
+                string_size += w + space;
+            }
         }
-        //uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
+        // uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
 
         char buf[20];
         sprintf(buf, "%x", RX.Message[1]);
-        //serialPrintln(buf);
+        // serialPrintln(buf);
 
-        //PRINTING VOLUME
-        u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18,  4,  2, "Vol:");
+        // PRINTING VOLUME
+        u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18, 4, 2, "Vol:");
         char volume_s[16];
         sprintf(volume_s, "%x", volume);
         u8g2_DrawStr(&u8g2, 118, 30, volume_s);
 
-        //PRINTING Octave
-        u8g2_DrawButtonUTF8(&u8g2, 75, 30, U8G2_BTN_BW1, 18,  4,  2, "Oct:");
+        // PRINTING Octave
+        u8g2_DrawButtonUTF8(&u8g2, 75, 30, U8G2_BTN_BW1, 18, 4, 2, "Oct:");
         char s[16];
         sprintf(s, "%x", octave);
         u8g2_DrawStr(&u8g2, 89, 30, s);
 
-        //PRINTING WAVE_FORM
-        u8g2_DrawButtonUTF8(&u8g2, 33, 30, 0, 30,  4,  3, "Wave:");
+        // PRINTING WAVE_FORM
+        u8g2_DrawButtonUTF8(&u8g2, 33, 30, 0, 30, 4, 3, "Wave:");
         char wave_s[16];
         sprintf(wave_s, "%x", output_wavetype);
-        //u8g2_DrawStr(&u8g2, 61, 30, wave_s);
+        // u8g2_DrawStr(&u8g2, 61, 30, wave_s);
         display_wave(&u8g2, 51, 30);
 
-        //PRINTING PET
+        // PRINTING PET
         u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-        if (localKeys == 0x0FFF) {
+        if (localKeys == 0x0FFF)
+        {
 
-                //u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
-                u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t);
-                u8g2_DrawUTF8(&u8g2, 2, 30, " \u029a");
-
-        } else {
-                //u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
-                u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t); //21x21
-                u8g2_DrawUTF8(&u8g2, 2, 30, " \u0299");
-                u8g2_SetFont(&u8g2, u8g2_font_unifont_t_0_76); //16x16
-                u8g2_DrawUTF8(&u8g2, 16, 27, " \u266a");
-                u8g2_DrawUTF8(&u8g2, 13, 19, " \u266a");
+            // u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
+            u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t);
+            u8g2_DrawUTF8(&u8g2, 2, 30, " \u029a");
+        }
+        else
+        {
+            // u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
+            u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t); // 21x21
+            u8g2_DrawUTF8(&u8g2, 2, 30, " \u0299");
+            u8g2_SetFont(&u8g2, u8g2_font_unifont_t_0_76); // 16x16
+            u8g2_DrawUTF8(&u8g2, 16, 27, " \u266a");
+            u8g2_DrawUTF8(&u8g2, 13, 19, " \u266a");
         }
 
         u8g2_SendBuffer(&u8g2);
-
     }
 }
 
-
 /**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM16 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
+ * @brief  Period elapsed callback in non blocking mode
+ * @note   This function is called  when TIM16 interrupt took place, inside
+ * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+ * a global variable "uwTick" used as application time base.
+ * @param  htim : TIM handle
+ * @retval None
+ */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM16) {
-		HAL_IncTick();
-	}
+    if (htim->Instance == TIM16)
+    {
+        HAL_IncTick();
+    }
 }
 
-//This function is executed in case of error occurrence.
+// This function is executed in case of error occurrence.
 void Error_Handler(void)
 {
     __disable_irq();
-    while (1) {
+    while (1)
+    {
     }
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+    /* USER CODE BEGIN 6 */
+    /* User can add his own implementation to report the file name and line number,
+       ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

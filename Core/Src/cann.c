@@ -24,18 +24,16 @@ void decode(void *argument)
     {
         osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
-        if (RX.Message[0] == 'H')
+        switch (RX.Message[0])
         {
-
+        case HANDSHAKE: {
             keyboard_count += 1;
 
             // termination (UNTESTED)
-
-            if (RX.Message[1] == 'X')
+            if (RX.Message[1] == TERMINATE)
             {
 
                 handshakeRequest = 0; // or osEventFlagsClear
-
                 // write the signals again to check for future disconnections
 
                 //                osMutexAcquire(readMutexHandle, osWaitForever);
@@ -49,19 +47,16 @@ void decode(void *argument)
                 // HERE, insert code to (re)start everything else
             }
         }
-
-        if (RX.Message[0] == 'C')
-        {
-
-            octave = 4 + keyboard_position - RX.Message[1];
+        break;
+        case OCTAVE_CHANGE: {
+            octave = RX.Message[2] + keyboard_position - RX.Message[1];
         }
-
-        if (RX.Message[0] == 'K')
-        {
-
+        break;
+        case KEYS: {
             uint16_t localKeys = (uint16_t)RX.Message[2] << 8 | RX.Message[1];
-
             allKeys[RX.Message[3]] = localKeys;
+        }
+        break;
         }
     }
 }
@@ -77,6 +72,7 @@ void CAN_Transmit(void *argument)
     }
 }
 
+
 void handshake(void *argument)
 {
 
@@ -90,7 +86,7 @@ void handshake(void *argument)
         outbits[5] = 1;
         outbits[6] = 1;
 
-        osDelay(2000);
+        osDelay(1000);
 
         // read the east-side incoming handshaking signal
         // the signal is inverted, ie, 0 if there is a keyboard attached
@@ -153,19 +149,21 @@ void handshake(void *argument)
 
         if (selected)
         {
-            controller = !controller;
+            is_receiver = !is_receiver;
 
+            /*
             if (controller)
             {
                 CanMsg_t TX;
                 TX.ID = 0x123;
-                TX.Message[0] = 'C';
+                TX.Message[0] = OCTAVE_CHANGE;
                 TX.Message[1] = keyboard_position;
+                TX.Message[2] = octave;
 
                 osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
                 octave = 4;
-            }
+            }*/
             vTaskDelay(500);
         }
     }
