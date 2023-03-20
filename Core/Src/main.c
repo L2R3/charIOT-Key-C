@@ -1,4 +1,5 @@
 #include "main.h"
+#include "cmsis_os2.h"
 #include "wavegen.h"
 #include "cmsis_os.h"
 #include "hardware_config.h"
@@ -64,11 +65,12 @@ const osThreadAttr_t handshakeTask_attributes = {
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for OutputTask */
-osThreadId_t OutputTaskHandle;
+osThreadId_t OutputTaskFirstHalfHandle;
+osThreadId_t OutputTaskSecondHalfHandle;
 const osThreadAttr_t OutputTask_attributes = {
   .name = "OutputTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 
 
@@ -142,6 +144,8 @@ uint8_t readCols();
 
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit, int8_t bottom_limit);
 void scanKnob(uint16_t localKnobs, uint16_t prev_Knobs, uint8_t knob_index, char type );
+void fill_output_first_half();
+void fill_output_second_half();
 
 int main(void)
 {
@@ -223,7 +227,8 @@ int main(void)
     decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
     CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
     handshakeTaskHandle = osThreadNew(handshake, NULL, &handshakeTask_attributes);
-    //OutputTaskHandle = osThreadNew(fill_output, NULL, &OutputTask_attributes);
+    OutputTaskFirstHalfHandle = osThreadNew(fill_output_first_half, NULL, &OutputTask_attributes);
+    OutputTaskSecondHalfHandle = osThreadNew(fill_output_second_half, NULL, &OutputTask_attributes);
 
     /* creation of outputFlag */
     outputFlagHandle = osEventFlagsNew(&outputFlag_attributes);
@@ -250,30 +255,34 @@ void delayMicro(uint16_t us) {
             ;
 }
 
+/// Task to fill the first half of the DMA output buffer
+void fill_output_first_half() {
 
-
-void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
-
-    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-
-    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
-
-    synthesize_output(localKeys, volume, octave, true);
-    
-    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+    for (;;) {
+        osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
+        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+        synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, true);
+        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+    }
 
 }
 
+void fill_output_second_half() {
+    for (;;) {
+        osEventFlagsWait(outputFlagHandle, 0x2, osFlagsWaitAny, osWaitForever);
+        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+        synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, false);
+        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+    }
+}
+
+
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac){
+    osEventFlagsSet(outputFlagHandle, 0x1); 
+}
+
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
-    
-    uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-
-    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
-
-    synthesize_output(localKeys, volume, octave, false);
-
-    HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
-
+    osEventFlagsSet(outputFlagHandle, 0x2); 
 }
 
 
@@ -508,10 +517,22 @@ void displayUpdateTask(void *argument)
         //PRINTING THE NOTES PRESSED
         uint8_t string_size = 2;
         uint8_t space = 3;
-        char o_s[16];
-        sprintf(o_s, "|%x|", controller);
-        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
-        string_size += 10;
+//        char o_s[16];
+//        sprintf(o_s, "|%x|", controller);
+//        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
+        if (controller){
+        	u8g2_DrawStr(&u8g2, string_size, 7, "|rcv|");
+        } else {
+        	u8g2_DrawStr(&u8g2, string_size, 7, "|snd|");
+        }
+
+        if (!controller){
+        	u8g2_SetDrawColor(&u8g2, 1);
+        	u8g2_SetBitmapMode(&u8g2, 0);
+        	u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2)-35*2,  2,  1, "Knob 0 to receive" );
+        }
+        string_size += 19;
+
         for (int t = 0; t < 12; t++){
                 if (notesPressed[t] != '-') {
                         uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);

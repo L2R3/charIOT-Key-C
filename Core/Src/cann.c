@@ -142,7 +142,7 @@ void handshake(void *argument)
         outbits[6] = 0;
     }
 
-    const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+    const TickType_t xFrequency = 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     //    prev_controller = controller;
 
@@ -166,7 +166,7 @@ void handshake(void *argument)
 
                 octave = 4;
             }
-            vTaskDelay(500);
+            //vTaskDelay(500);
         }
     }
 }
