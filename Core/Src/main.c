@@ -102,7 +102,7 @@ uint16_t allKeys[10];
 volatile bool outbits [7] = {1, 1, 1, 1, 1, 1, 1};  
 
 u8g2_t u8g2;
-CAN_MSG_t RX;
+CanMsg_t RX;
 
 volatile uint16_t keys = 0x0FFF;
 volatile uint16_t prev_keys = 0x0FFF;
@@ -213,8 +213,8 @@ int main(void)
     // Create queues
     const osMessageQueueAttr_t msgInQ_attributes = {.name = "msgInQ"};
     const osMessageQueueAttr_t msgOutQ_attributes = {.name = "msgOutQ"};
-    msgInQHandle = osMessageQueueNew (36, sizeof(CAN_MSG_t), &msgInQ_attributes);
-    msgOutQHandle = osMessageQueueNew (36, sizeof(CAN_MSG_t), &msgOutQ_attributes);
+    msgInQHandle = osMessageQueueNew (36, sizeof(CanMsg_t), &msgInQ_attributes);
+    msgOutQHandle = osMessageQueueNew (36, sizeof(CanMsg_t), &msgOutQ_attributes);
 
     // Create threads
     defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
@@ -473,7 +473,7 @@ void scanKeysTask(void *argument)
 //        	volume = 0;
 //    	}
 
-        CAN_MSG_t TX;
+        CanMsg_t TX;
 
         TX.ID = 0x123;
         TX.Message[0] = 'K';

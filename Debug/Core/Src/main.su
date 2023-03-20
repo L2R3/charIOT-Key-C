@@ -14,4 +14,4 @@
 ../Core/Src/main.c:428:6:scanKeysTask	56	static
 ../Core/Src/main.c:489:6:displayUpdateTask	136	static
 ../Core/Src/main.c:578:6:HAL_TIM_PeriodElapsedCallback	16	static
-../Core/Src/main.c:586:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:586:6:Error_Handler	4	static

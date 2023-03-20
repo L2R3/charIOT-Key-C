@@ -9,7 +9,7 @@
 typedef struct {
 	uint8_t Message[8];
 	uint32_t ID;
-} CAN_MSG_t;
+} CanMsg_t;
 
 typedef enum {
     DEN_BIT = 3,
@@ -17,6 +17,12 @@ typedef enum {
     HKOW_BIT = 5,
     HKOE_BIT = 6,
 } DFFBitFunction;
+
+typedef enum {
+    // Map each enum to a relevant ASCII char for easy debugging
+    HANDSHAKE = 'H',
+    TERMINATE = 'X',
+} CannMsgType;
 
 void decode(void *argument);
 void CAN_Transmit(void *argument);
