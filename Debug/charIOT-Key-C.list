@@ -7252,9 +7252,9 @@ void u8x8_Setup(u8x8_t *u8x8, u8x8_msg_cb display_cb, u8x8_msg_cb cad_cb, u8x8_m
 	...
 
 08003214 <decode>:
-
 volatile bool HKIW = false;
 volatile bool HKIE = false;
+//volatile bool prev_controller = 0;
 
 void decode(void *argument)
 {
@@ -7542,6 +7542,7 @@ void handshake(void *argument)
  800339e:	f00a fa9d 	bl	800d8dc <xTaskGetTickCount>
  80033a2:	4603      	mov	r3, r0
  80033a4:	623b      	str	r3, [r7, #32]
+//    prev_controller = controller;
 
     for(;;){
 
@@ -7556,8 +7557,7 @@ void handshake(void *argument)
  80033b4:	781b      	ldrb	r3, [r3, #0]
  80033b6:	2b00      	cmp	r3, #0
  80033b8:	d0f5      	beq.n	80033a6 <handshake+0xae>
-
-    		controller = !controller;
+			controller = !controller;
  80033ba:	4b1f      	ldr	r3, [pc, #124]	; (8003438 <handshake+0x140>)
  80033bc:	781b      	ldrb	r3, [r3, #0]
  80033be:	2b00      	cmp	r3, #0
@@ -7572,25 +7572,26 @@ void handshake(void *argument)
  80033d4:	4b18      	ldr	r3, [pc, #96]	; (8003438 <handshake+0x140>)
  80033d6:	701a      	strb	r2, [r3, #0]
 
-    		if (controller){
+//    		if (prev_controller != controller){
+				if (controller){
  80033d8:	4b17      	ldr	r3, [pc, #92]	; (8003438 <handshake+0x140>)
  80033da:	781b      	ldrb	r3, [r3, #0]
  80033dc:	2b00      	cmp	r3, #0
  80033de:	d013      	beq.n	8003408 <handshake+0x110>
-				CAN_MSG_t TX;
-				TX.ID = 0x123;
+					CAN_MSG_t TX;
+					TX.ID = 0x123;
  80033e0:	f240 1323 	movw	r3, #291	; 0x123
  80033e4:	613b      	str	r3, [r7, #16]
-				TX.Message[0] = 'C';
+					TX.Message[0] = 'C';
  80033e6:	2343      	movs	r3, #67	; 0x43
  80033e8:	723b      	strb	r3, [r7, #8]
-				TX.Message[1] = keyboard_position;
+					TX.Message[1] = keyboard_position;
  80033ea:	4b0e      	ldr	r3, [pc, #56]	; (8003424 <handshake+0x12c>)
  80033ec:	781b      	ldrb	r3, [r3, #0]
  80033ee:	b2db      	uxtb	r3, r3
  80033f0:	727b      	strb	r3, [r7, #9]
 
-				osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+					osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
  80033f2:	4b0f      	ldr	r3, [pc, #60]	; (8003430 <handshake+0x138>)
  80033f4:	6818      	ldr	r0, [r3, #0]
  80033f6:	f107 0108 	add.w	r1, r7, #8
@@ -7598,12 +7599,13 @@ void handshake(void *argument)
  80033fc:	2200      	movs	r2, #0
  80033fe:	f008 fc2b 	bl	800bc58 <osMessageQueuePut>
 
-				octave = 4;
+					octave = 5;
  8003402:	4b09      	ldr	r3, [pc, #36]	; (8003428 <handshake+0x130>)
- 8003404:	2204      	movs	r2, #4
+ 8003404:	2205      	movs	r2, #5
  8003406:	801a      	strh	r2, [r3, #0]
-    		}
-    		vTaskDelay(500);
+				}
+//				prev_controller = controller;
+				vTaskDelay(500);
  8003408:	f44f 70fa 	mov.w	r0, #500	; 0x1f4
  800340c:	f00a f916 	bl	800d63c <vTaskDelay>
     	vTaskDelayUntil(&xLastWakeTime, xFrequency);
