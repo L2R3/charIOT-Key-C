@@ -17,6 +17,8 @@ typedef enum {
     SQUARE,
     TRIANGLE,
     CLARINET,
+	RETRO1,
+	RETRO2,
     END_WAVETYPE,
 } WaveType;
 

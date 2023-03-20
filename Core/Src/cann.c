@@ -147,18 +147,21 @@ void handshake(void *argument)
 
     	if (selected) {
 
-    		controller = 1;
+    		controller = !controller;
 
-    		CAN_MSG_t TX;
-    		TX.ID = 0x123;
-    		TX.Message[0] = 'C';
-    		TX.Message[1] = keyboard_position;
+    		if (controller){
+				CAN_MSG_t TX;
+				TX.ID = 0x123;
+				TX.Message[0] = 'C';
+				TX.Message[1] = keyboard_position;
 
-    		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+				osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
-    		octave = 4;
-
+				octave = 4;
+    		}
+    		osDelay(500);
     	}
+
 
     }
 

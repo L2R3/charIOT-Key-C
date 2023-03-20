@@ -188,7 +188,7 @@ int main(void)
     UID0 = HAL_GetUIDw0();
 
     init_lookup_tables();
-    set_output_waveform(SINE);
+    set_output_waveform(SAWTOOTH);
 
     // Init scheduler
     osKernelInitialize();
@@ -398,17 +398,17 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char 
 		//	sprintf(s, "volume: %d", volume);
 		//	serialPrintln(s);
 		} else if (type == 'o'){
-                    int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8, 2); // can only go one lower than the default octave
-                    octave = octave + change_octave;
-                    //	sprintf(s, "octave: %d", octave);
-                    //	serialPrintln(s);
+			int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8, 2); // can only go one lower than the default octave
+			octave = octave + change_octave;
+			//	sprintf(s, "octave: %d", octave);
+			//	serialPrintln(s);
 		} else if (type == 'w'){
-			int16_t change_wave = changeKnobState(knobState, previousKnobState, output_wavetype, 4, 0);
+			int16_t change_wave = changeKnobState(knobState, previousKnobState, output_wavetype, END_WAVETYPE-1, 0);
 			WaveType new_wavetype = (output_wavetype + change_wave) % END_WAVETYPE;
-                        //	sprintf(s, "wave_form: %d", wave_form);
-                        //	serialPrintln(s);
-                        //
-                        set_output_waveform(new_wavetype);
+			//	sprintf(s, "wave_form: %d", wave_form);
+			//	serialPrintln(s);
+			//
+			set_output_waveform(new_wavetype);
 		}
 	}
 
@@ -466,12 +466,12 @@ void scanKeysTask(void *argument)
         scanKnob(localKnobs, (uint16_t) prev_knobs, 1, 'w');
 
         // not working, how do we actually set volume ???
-        if (controller) {
-        	volume = 8;
-        }
-        else {
+        if (!controller) {
         	volume = 0;
-    	}
+        }
+//        else {
+//        	volume = 0;
+//    	}
 
         CAN_MSG_t TX;
 

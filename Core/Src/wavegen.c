@@ -14,9 +14,11 @@ int16_t sine_table[DDS_LUT_SAMPLES];
 int16_t square_table[DDS_LUT_SAMPLES];
 int16_t triangle_table[DDS_LUT_SAMPLES];
 int16_t clarinet_table[DDS_LUT_SAMPLES];
+int16_t retro1_table[DDS_LUT_SAMPLES];
+int16_t retro2_table[DDS_LUT_SAMPLES];
 
 int16_t *DDS_LUT[END_WAVETYPE] = { sawtooth_table, sine_table, square_table,
-		triangle_table, clarinet_table };
+		triangle_table, clarinet_table, retro1_table, retro2_table, };
 int16_t DDS_LUT_SEL[DDS_LUT_SAMPLES];
 
 uint16_t DDS_indices[12] = { 0 };
@@ -94,6 +96,72 @@ void generate_waveform(int16_t lookup_table[DDS_LUT_SAMPLES], WaveType wave) {
 		}
 	}
 		break;
+	case RETRO1: {
+		int tone1 = DDS_LUT_SAMPLES*0.2;
+		int tone2 = DDS_LUT_SAMPLES*0.4;
+		int tone3 = DDS_LUT_SAMPLES*0.3;
+		uint32_t curr_samples = 0;
+		uint32_t step_samples = curr_samples+tone1;
+		uint32_t half_step_samples = step_samples / 2;
+
+		for (int i = curr_samples; i < step_samples; i++) {
+			float wave =  2048*sin(2.0 * M_PI * (float)i *5 / ((float) tone1)) /5;
+			lookup_table[i] = 0.4*wave;
+		}
+		curr_samples = step_samples;
+
+		step_samples = curr_samples+tone2;
+		half_step_samples = curr_samples + tone2 / 2;
+		for (int i = curr_samples; i < step_samples; i++) {
+			float wave =  2048*sin(2.0 * M_PI * (float)i / ((float) tone2));
+			lookup_table[i] = 1*wave;
+		}
+		curr_samples = step_samples;
+
+		step_samples = curr_samples+tone3;
+		half_step_samples = curr_samples + tone3 / 2;
+		for (int i = curr_samples; i < step_samples; i++) {
+			float wave =  2048*sin(2.0 * M_PI * (float)i / ((float) tone3));
+			lookup_table[i] = 0.7*wave;
+		}
+		curr_samples = step_samples;
+
+		half_step_samples = step_samples + (DDS_LUT_SAMPLES - step_samples) / 2;
+		for (int i = curr_samples; i < DDS_LUT_SAMPLES; i++) {
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);;
+			lookup_table[i] = 0.3*wave;
+		}
+	}
+		break;
+	case RETRO2: {
+		int tone1 = DDS_LUT_SAMPLES*0.4;
+		int tone2 = DDS_LUT_SAMPLES*0.3;
+		uint32_t curr_samples = 0;
+		uint32_t step_samples = curr_samples+tone1;
+		uint32_t half_step_samples = curr_samples + tone1 / 2;
+		for (int i = curr_samples; i < step_samples; i++) {
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+			wave += 2048 * sin(2.0 * M_PI * (float)i / ((float) tone1));
+			lookup_table[i] = 1*wave;
+		}
+		curr_samples = step_samples;
+
+		step_samples = curr_samples+tone2;
+		half_step_samples = curr_samples + tone2 / 2;
+		for (int i = curr_samples; i < step_samples; i++) {
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+			lookup_table[i] = 0.7*wave;
+		}
+		curr_samples = step_samples;
+
+		half_step_samples = step_samples + (DDS_LUT_SAMPLES - step_samples) / 2;
+		for (int i = curr_samples; i < DDS_LUT_SAMPLES; i++) {
+			float wave =  (i <= half_step_samples) ? 2048 * (1.0) : 2048 * (-1.0);
+			lookup_table[i] = 0.3*wave;
+		}
+
+	}
+		break;
 	default:
 	case CLARINET: {
 		//serialPrint("clarinetgen\n");
@@ -153,6 +221,16 @@ void display_wave(u8g2_t *u8g2, uint16_t x, uint16_t y) {
 	case TRIANGLE: {
 		u8g2_SetFont(u8g2, u8g2_font_7x13_t_symbols);
 		u8g2_DrawUTF8(u8g2, x, y, " \u25b2");
+	}
+		break;
+	case RETRO1: {
+		u8g2_SetFont(u8g2, u8g2_font_7x13_t_symbols);
+		u8g2_DrawUTF8(u8g2, x, y, " \u2600");
+	}
+		break;
+	case RETRO2: {
+		u8g2_SetFont(u8g2, u8g2_font_7x13_t_symbols);
+		u8g2_DrawUTF8(u8g2, x, y, " \u2604");
 	}
 		break;
 	default:
