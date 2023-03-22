@@ -3,9 +3,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include <main.h>
+#include "main.h"
 #include "wavegen.h"
 #include "cmsis_os.h"
+#include "hardware_config.h"
 
 #ifndef CAN_H
 #define CAN_H

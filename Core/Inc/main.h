@@ -47,13 +47,37 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+// define when doing timing analysis
+#undef TIMING_TEST
+
+// select task to time (only one at a time)
+#ifdef TIMING_TEST
+
+#undef OUTPUT_TEST
+#undef DISPLAY_TEST	// here display task is being measured
+#undef SCANKEYS_TEST
+#define CANTX_TEST
+#undef HANDSHAKE_TEST
+#undef DECODE_TEST
+
+#else // enable all tasks
+
+#define OUTPUT_TEST
+#define DISPLAY_TEST
+#define SCANKEYS_TEST
+#define CANTX_TEST
+#define HANDSHAKE_TEST
+#define DECODE_TEST
+
+#endif
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void serialPrint(char val[]);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

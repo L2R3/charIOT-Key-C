@@ -260,7 +260,7 @@ inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, boo
     // synthesise the waveform by addition
     for (int i = sample_begin; i < sample_end; i++)
     {
-        int32_t out = 0;
+        int16_t out = 0;
 
         for (int key = 0; key < 12; key++){
             if(notes_played[key]) {
@@ -275,7 +275,7 @@ inline void synthesize_output(uint16_t keys, uint8_t volume, uint8_t octave, boo
             }
         }
 
-        DDS_OUT[i] = ((uint16_t)(out >> (12 - volume))) + 2048;
+        DDS_OUT[i] = (out >> (12 - volume)) + 2048;
         //DDS_OUT[i] = 0;
     }
 }

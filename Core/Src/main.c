@@ -1,7 +1,6 @@
 #include "main.h"
 #include "cann.h"
 #include "cmsis_os.h"
-#include "cmsis_os2.h"
 #include "hardware_config.h"
 #include "wavegen.h"
 
@@ -26,7 +25,7 @@ bool selected = 0;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
     .name = "defaultTask",
-    .stack_size = 128 * 4,
+    .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for scanKeys */
@@ -148,9 +147,11 @@ int main(void)
     MX_DAC1_Init();
     MX_TIM6_Init();
     MX_TIM7_Init();
+    MX_TIM15_Init();
 
     HAL_TIM_Base_Start(&htim7);
     HAL_TIM_Base_Start(&htim6);
+    HAL_TIM_Base_Start(&htim15);
 
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
@@ -172,6 +173,7 @@ int main(void)
     HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY);
 
     serialPrintln("charIOT-Key-C");
+
     UID0 = HAL_GetUIDw0();
 
     init_lookup_tables();
@@ -205,20 +207,44 @@ int main(void)
 
     // Create threads
     defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+#ifdef SCANKEYS_TEST
     scanKeysHandle = osThreadNew(scanKeysTask, NULL, &scanKeys_attributes);
+#endif
+#ifdef DISPLAY_TEST
     displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
+#endif
+#ifdef DECODE_TEST
     decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
+#endif
+#ifdef CANTX_TEST
     CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
+#endif
+#ifdef HANDSHAKE_TEST
     handshakeTaskHandle = osThreadNew(handshake, NULL, &handshakeTask_attributes);
+#endif
+#ifdef OUTPUT_TEST
     OutputTaskFirstHalfHandle = osThreadNew(fill_output_first_half, NULL, &OutputTask_attributes);
     OutputTaskSecondHalfHandle = osThreadNew(fill_output_second_half, NULL, &OutputTask_attributes);
+#endif
 
     /* creation of outputFlag */
     outputFlagHandle = osEventFlagsNew(&outputFlag_attributes);
 
+#ifdef TIMING_TEST
+    __disable_irq();
+#endif
+
     // Start scheduler
     osKernelStart();
 }
+
+//void configureTimerForRunTimeStats (void){
+//	htim15.Instance->CNT = 0;
+//}
+//
+//unsigned long getRunTimeCounterValue(void) {
+//	return htim15.Instance->CNT;
+//}
 
 void serialPrint(char val[])
 {
@@ -240,26 +266,46 @@ void delayMicro(uint16_t us)
 }
 
 /// Task to fill the first half of the DMA output buffer
-void fill_output_first_half()
+void fill_output_first_half(void *argument)
 {
-
     for (;;)
     {
+
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#else
         osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+#endif
+
         synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, true);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 
-void fill_output_second_half()
+void fill_output_second_half(void *argument)
 {
     for (;;)
     {
-        osEventFlagsWait(outputFlagHandle, 0x2, osFlagsWaitAny, osWaitForever);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
+//#ifdef TIMING_TEST
+//        htim15.Instance->CNT = 0;
+//#else
+        osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
+//#endif
+
         synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, false);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+
+//#ifdef TIMING_TEST
+//		char timBuf[10];
+//		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+//		serialPrintln(timBuf);
+//#endif
+
     }
 }
 
@@ -377,10 +423,6 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char 
     uint8_t rowKnobStates = (localKnobs >> shift_row) & row;
     uint8_t rowPrevKnobStates = (prevKnobs >> shift_row) & row;
 
-    //	char s[32];
-    //	sprintf(s, "rowKnobStates:%x", rowKnobStates);
-    //	serialPrintln(s);
-
     uint8_t knobState = (rowKnobStates >> knob_on_row * 2) & 0b11;
     uint8_t previousKnobState = (rowPrevKnobStates >> knob_on_row * 2) & 0b11;
 
@@ -429,22 +471,27 @@ void StartDefaultTask(void *argument)
 {
     for (;;)
     {
-        vTaskDelay(1000);
-        char buf[20];
+        vTaskDelay(1);
 
-        /*
-        uint8_t notes_played [12];
+//#ifdef TIMING_TEST
+//
+//        TaskStatus_t testStatus;
+//
+//        vTaskGetInfo(TestTaskHandle, &testStatus, pdTRUE, eInvalid);
+//        char buf[100];
+//
+//        sprintf(buf, "%lu", testStatus.ulRunTimeCounter/task_count);
+//        serialPrintln(buf);
 
-        for (int key = 0; key < 12; key++) {
-            notes_played[key] = 0;
-            for (int board = 0; board < keyboard_count; board++) {
-                notes_played[key] |= ((~(allKeys[board]) >> key) & 1) << board;
-            }
-            sprintf(buf, "%i, %x", key, notes_played[key]);
-            serialPrintln(buf);
-        }
-        serialPrintln("\n\n");
-        */
+//        sprintf(buf, "%lu", task_count);
+//        serialPrintln(buf);
+//
+//#endif
+
+//        vTaskGetRunTimeStats(buf);
+//
+//        serialPrintln(buf);
+
     }
 }
 
@@ -458,22 +505,16 @@ void scanKeysTask(void *argument)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#endif
+
         setMuxIO();
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
         uint16_t localKnobs = __atomic_load_n(&knobs, __ATOMIC_RELAXED);
 
         allKeys[keyboard_position] = localKeys;
 
-        // char key_s[16];
-        // sprintf(key_s, "%x", localKeys);
-        // char knobs_s[16];
-        // sprintf(knobs_s, "%x", localKnobs);
-        //
-        // serialPrint("keys: ");
-        // serialPrintln(key_s);
-        // serialPrint("knobs: ");
-        // serialPrintln(knobs_s);
-        uint8_t keys_pressed = 0;
         for (int t = 0; t < 12; t++)
         {
             bool pressed = ~localKeys & (1 << (t));
@@ -481,7 +522,6 @@ void scanKeysTask(void *argument)
             if (pressed)
             {
                 notesPressed[t] = keyNotes[t];
-                keys_pressed += 1;
             }
             else
             {
@@ -507,6 +547,13 @@ void scanKeysTask(void *argument)
         TX.Message[3] = (uint8_t)keyboard_position;
 
         osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 
@@ -518,13 +565,17 @@ void displayUpdateTask(void *argument)
 
     for (;;)
     {
+
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#endif
+
         osMutexAcquire(keysMutexHandle, osWaitForever);
-
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-
         osMutexRelease(keysMutexHandle);
+
         osMutexRelease(knobsMutexHandle);
 
         u8g2_ClearBuffer(&u8g2);
@@ -533,9 +584,6 @@ void displayUpdateTask(void *argument)
         // PRINTING THE NOTES PRESSED
         uint8_t string_size = 2;
         uint8_t space = 3;
-        //        char o_s[16];
-        //        sprintf(o_s, "|%x|", controller);
-        //        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
         if (is_receiver)
         {
             u8g2_DrawStr(&u8g2, string_size, 7, "|rcv|");
@@ -543,31 +591,23 @@ void displayUpdateTask(void *argument)
         else
         {
             u8g2_DrawStr(&u8g2, string_size, 7, "|snd|");
+            u8g2_SetDrawColor(&u8g2, 1);
+			u8g2_SetBitmapMode(&u8g2, 0);
+			u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2) - 35 * 2, 2, 1,
+								"Knob 0 to receive");
         }
 
-        if (!is_receiver)
-        {
-            u8g2_SetDrawColor(&u8g2, 1);
-            u8g2_SetBitmapMode(&u8g2, 0);
-            u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2) - 35 * 2, 2, 1,
-                                "Knob 0 to receive");
-        }
         string_size += 19;
 
         for (int t = 0; t < 12; t++)
         {
-            if (notesPressed[t] != '-')
+            if (*notesPressed[t] != '-')
             {
                 uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
                 u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);
                 string_size += w + space;
             }
         }
-        // uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
-
-        char buf[20];
-        sprintf(buf, "%x", RX.Message[1]);
-        // serialPrintln(buf);
 
         // PRINTING VOLUME
         u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18, 4, 2, "Vol:");
@@ -608,6 +648,13 @@ void displayUpdateTask(void *argument)
         }
 
         u8g2_SendBuffer(&u8g2);
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 

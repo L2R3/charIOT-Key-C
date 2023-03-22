@@ -24,6 +24,10 @@ void decode(void *argument)
     {
         osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#endif
+
         switch (RX.Message[0])
         {
         case HANDSHAKE: {
@@ -58,6 +62,13 @@ void decode(void *argument)
         }
         break;
         }
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 
@@ -66,9 +77,34 @@ void CAN_Transmit(void *argument)
     CanMsg_t TX;
     for (;;)
     {
+
+#ifdef TIMING_TEST
+
+    	TX.ID = 0x123;
+		TX.Message[0] = 'K';
+		TX.Message[1] = (uint8_t)(0x0FFF & 0x00FF);
+		TX.Message[2] = (uint8_t)((0x0FFF & 0xFF00) >> 8);
+		TX.Message[3] = (uint8_t)keyboard_position;
+
+    	osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+#endif
+
         osMessageQueueGet(msgOutQHandle, &TX, NULL, osWaitForever);
+
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#endif
+
         osSemaphoreAcquire(CAN_TX_SemaphoreHandle, osWaitForever);
         CAN_TX(TX.ID, TX.Message);
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 
@@ -97,10 +133,12 @@ void handshake(void *argument)
         // starting from the leftmost keyboard
 
         // wait for the west-side handshaking signal to go high
+#ifndef TIMING_TEST
         while (!HKIW)
         {
             osDelay(100);
         }
+#endif
 
         // keyboard_count is incremented at every received CAN message
         // -> see the decode task
@@ -147,6 +185,10 @@ void handshake(void *argument)
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
+#ifdef TIMING_TEST
+        htim15.Instance->CNT = 0;
+#endif
+
         if (selected)
         {
             is_receiver = !is_receiver;
@@ -166,6 +208,13 @@ void handshake(void *argument)
             }*/
             vTaskDelay(500);
         }
+
+#ifdef TIMING_TEST
+		char timBuf[10];
+		sprintf(timBuf, "%lu", htim15.Instance->CNT);
+		serialPrintln(timBuf);
+#endif
+
     }
 }
 
