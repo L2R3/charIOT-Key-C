@@ -1,5 +1,6 @@
-../Core/Src/wavegen.c:23:6:init_lookup_tables	16	static
-../Core/Src/wavegen.c:37:6:generate_waveform	176	static
-../Core/Src/wavegen.c:172:6:set_output_waveform	16	static
-../Core/Src/wavegen.c:190:6:display_wave	16	static
-../Core/Src/wavegen.c:235:13:synthesize_output	64	static
+../Core/Src/wavegen.c:17:6:init_lookup_tables	16	static
+../Core/Src/wavegen.c:28:6:generate_waveform	176	static
+../Core/Src/wavegen.c:168:6:set_output_waveform	16	static
+../Core/Src/wavegen.c:182:6:display_wave	16	static
+../Core/Src/wavegen.c:224:13:synthesise_output1	80	dynamic
+../Core/Src/wavegen.c:267:13:synthesise_output2	80	dynamic

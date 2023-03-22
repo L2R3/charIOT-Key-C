@@ -1,7 +1,6 @@
 #include "main.h"
 #include "cann.h"
 #include "cmsis_os.h"
-#include "cmsis_os2.h"
 #include "hardware_config.h"
 #include "wavegen.h"
 
@@ -76,13 +75,19 @@ const osThreadAttr_t OutputTask_attributes = {
 /* Definitions for keysMutex */
 osMutexId_t keysMutexHandle;
 const osMutexAttr_t keysMutex_attributes = {.name = "keysMutex"};
+
 /* Definitions for knobsMutex */
 osMutexId_t knobsMutexHandle;
 const osMutexAttr_t knobsMutex_attributes = {.name = "knobsMutex"};
 
+osMutexId_t notesMutexHandle;
+const osMutexAttr_t notesMutex_attributes = {.name = "notesMutex"};
+
 /* Definitions for read mutex */
 osMutexId_t readMutexHandle;
 const osMutexAttr_t readMutex_attributes = {.name = "readMutex"};
+
+
 /* Definitions for outputFlag */
 osEventFlagsId_t outputFlagHandle;
 const osEventFlagsAttr_t outputFlag_attributes = {.name = "outputFlag"};
@@ -90,7 +95,7 @@ const osEventFlagsAttr_t outputFlag_attributes = {.name = "outputFlag"};
 uint32_t DMAkeys;
 uint32_t DMAkeys2;
 
-uint16_t allKeys[MAX_KEYBOARDS];
+volatile uint16_t allKeys[MAX_KEYBOARDS];
 
 volatile bool outbits[7] = {1, 1, 1, 1, 1, 1, 1};
 
@@ -102,9 +107,12 @@ volatile uint16_t prev_keys = 0x0FFF;
 volatile uint16_t knobs = 0xFF;
 volatile uint16_t prev_knobs = 0xFF;
 
-uint16_t volume = 8;
+volatile uint8_t volume = 8;
 uint16_t octave = 4;
-uint16_t default_octave = 4;
+
+volatile int8_t pos_oct_diff = -4;
+
+volatile uint8_t keyboard_position;
 
 const char *keyNotes[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
 char *notesPressed[12] = {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'};
@@ -185,6 +193,8 @@ int main(void)
     knobsMutexHandle = osMutexNew(&knobsMutex_attributes);
     readMutexHandle = osMutexNew(&readMutex_attributes);
 
+    notesMutexHandle = osMutexNew(&notesMutex_attributes);
+
     // Add mutexes
     osMutexRelease(keysMutexHandle);
     osMutexRelease(knobsMutexHandle);
@@ -239,16 +249,13 @@ void delayMicro(uint16_t us)
         ;
 }
 
-/// Task to fill the first half of the DMA output buffer
+// Tasks to fill the first half of the DMA output buffer
 void fill_output_first_half()
 {
-
     for (;;)
     {
         osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
-        synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, true);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+        synthesise_output1();
     }
 }
 
@@ -257,9 +264,7 @@ void fill_output_second_half()
     for (;;)
     {
         osEventFlagsWait(outputFlagHandle, 0x2, osFlagsWaitAny, osWaitForever);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_SET);
-        synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, false);
-        HAL_GPIO_WritePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin, GPIO_PIN_RESET);
+        synthesise_output2();
     }
 }
 
@@ -408,6 +413,8 @@ void scanKnob(uint16_t localKnobs, uint16_t prevKnobs, uint8_t knob_index, char 
             int16_t change_octave = changeKnobState(knobState, previousKnobState, octave, 8,
                                                     2); // can only go one lower than the default octave
             octave = octave + change_octave;
+            int8_t localDiff = keyboard_position - octave;
+            __atomic_store_n(&pos_oct_diff, localDiff, __ATOMIC_RELAXED);
 
             CanMsg_t TX;
             TX.ID = 0x123;

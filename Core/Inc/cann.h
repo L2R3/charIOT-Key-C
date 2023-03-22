@@ -3,9 +3,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include <main.h>
-#include "wavegen.h"
 #include "cmsis_os.h"
+
+#include "wavegen.h"
+#include "main.h"
 
 #ifndef CAN_H
 #define CAN_H
@@ -65,6 +66,9 @@ extern uint16_t octave;
 extern bool selected;
 extern bool is_receiver;
 
-extern uint16_t allKeys[MAX_KEYBOARDS];
+extern volatile uint16_t allKeys[MAX_KEYBOARDS];
+
+extern volatile int8_t pos_oct_diff;
+extern volatile uint8_t keyboard_position;
 
 #endif
