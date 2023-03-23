@@ -113,7 +113,6 @@ volatile int8_t pos_oct_diff = -4;
 volatile uint8_t keyboard_position;
 
 const char *keyNotes[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
-char *notesPressed[12];
 
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
@@ -460,20 +459,6 @@ void scanKeysTask(void *argument)
 		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
 		__atomic_store_n(&knobs, localKnobs, __ATOMIC_RELAXED);
 
-        for (int t = 0; t < 12; t++)
-        {
-            bool pressed = ~localKeys & (1 << t);
-
-            if (pressed)
-            {
-                notesPressed[t] = keyNotes[t];
-            }
-            else
-            {
-                notesPressed[t] = NULL;
-            }
-        }
-
         scanKnob(localKnobs, (uint16_t)prev_knobs, 3, 'v');
         scanKnob(localKnobs, (uint16_t)prev_knobs, 2, 'o');
         scanKnob(localKnobs, (uint16_t)prev_knobs, 1, 'w');
@@ -508,12 +493,25 @@ void displayUpdateTask(void *argument)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        osMutexAcquire(keysMutexHandle, osWaitForever);
-
+        //osMutexAcquire(keysMutexHandle, osWaitForever);
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
+        //osMutexRelease(keysMutexHandle);
 
-        osMutexRelease(keysMutexHandle);
-        osMutexRelease(knobsMutexHandle);
+        static char *notesPressed[12];
+
+        for (int t = 0; t < 12; t++)
+		{
+			bool pressed = ~localKeys & (1 << t);
+
+			if (pressed)
+			{
+				notesPressed[t] = keyNotes[t];
+			}
+			else
+			{
+				notesPressed[t] = NULL;
+			}
+		}
 
         u8g2_ClearBuffer(&u8g2);
         u8g2_SetFont(&u8g2, u8g2_font_new3x9pixelfont_tr);
@@ -521,9 +519,6 @@ void displayUpdateTask(void *argument)
         // PRINTING THE NOTES PRESSED
         uint8_t string_size = 2;
         uint8_t space = 3;
-        //        char o_s[16];
-        //        sprintf(o_s, "|%x|", controller);
-        //        u8g2_DrawStr(&u8g2, string_size, 7, o_s);
         if (is_receiver)
         {
             u8g2_DrawStr(&u8g2, string_size, 7, "|rcv|");
@@ -531,14 +526,10 @@ void displayUpdateTask(void *argument)
         else
         {
             u8g2_DrawStr(&u8g2, string_size, 7, "|snd|");
-        }
-
-        if (!is_receiver)
-        {
             u8g2_SetDrawColor(&u8g2, 1);
-            u8g2_SetBitmapMode(&u8g2, 0);
-            u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2) - 35 * 2, 2, 1,
-                                "Knob 0 to receive");
+			u8g2_SetBitmapMode(&u8g2, 0);
+			u8g2_DrawButtonUTF8(&u8g2, 35, 16, U8G2_BTN_INV, u8g2_GetDisplayWidth(&u8g2) - 35 * 2, 2, 1,
+								"Knob 0 to receive");
         }
         string_size += 19;
 
@@ -551,11 +542,6 @@ void displayUpdateTask(void *argument)
                 string_size += w + space;
             }
         }
-        // uint32_t localDMAkeys2 = __atomic_load_n(&DMAkeys2, __ATOMIC_RELAXED);
-
-        char buf[20];
-        sprintf(buf, "%x", RX.Message[1]);
-        // serialPrintln(buf);
 
         // PRINTING VOLUME
         u8g2_DrawButtonUTF8(&u8g2, 105, 30, U8G2_BTN_BW1, 18, 4, 2, "Vol:");
@@ -573,21 +559,17 @@ void displayUpdateTask(void *argument)
         u8g2_DrawButtonUTF8(&u8g2, 33, 30, 0, 30, 4, 3, "Wave:");
         char wave_s[16];
         sprintf(wave_s, "%x", output_wavetype);
-        // u8g2_DrawStr(&u8g2, 61, 30, wave_s);
         display_wave(&u8g2, 51, 30);
 
         // PRINTING PET
         u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
         if (localKeys == 0x0FFF)
         {
-
-            // u8g2_DrawStr(&u8g2, 70, 10, "- ^_^ -");
             u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t);
             u8g2_DrawUTF8(&u8g2, 2, 30, " \u029a");
         }
         else
         {
-            // u8g2_DrawStr(&u8g2, 70, 10, "- ^0^ -");
             u8g2_SetFont(&u8g2, u8g2_font_streamline_all_t); // 21x21
             u8g2_DrawUTF8(&u8g2, 2, 30, " \u0299");
             u8g2_SetFont(&u8g2, u8g2_font_unifont_t_0_76); // 16x16
@@ -596,7 +578,10 @@ void displayUpdateTask(void *argument)
         }
 
         u8g2_SendBuffer(&u8g2);
+
+        HAL_GPIO_TogglePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin);
     }
+
 }
 
 /**
