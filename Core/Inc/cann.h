@@ -68,5 +68,6 @@ extern volatile uint16_t allKeys[MAX_KEYBOARDS];
 
 extern volatile int8_t pos_oct_diff;
 extern volatile uint8_t keyboard_position;
+extern volatile uint8_t volume;
 
 #endif

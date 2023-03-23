@@ -113,7 +113,7 @@ volatile int8_t pos_oct_diff = -4;
 volatile uint8_t keyboard_position;
 
 const char *keyNotes[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
-char *notesPressed[12] = {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'};
+char *notesPressed[12];
 
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
@@ -188,12 +188,12 @@ int main(void)
     // Mutex creation
     keysMutexHandle = osMutexNew(&keysMutex_attributes);
     knobsMutexHandle = osMutexNew(&knobsMutex_attributes);
-
     notesMutexHandle = osMutexNew(&notesMutex_attributes);
 
     // Add mutexes
     osMutexRelease(keysMutexHandle);
     osMutexRelease(knobsMutexHandle);
+    osMutexRelease(notesMutexHandle);
 
     // Create semaphores
     const osSemaphoreAttr_t CAN_TX_Semaphore_attributes = {.name = "CAN_TX_Semaphore"};
@@ -412,18 +412,18 @@ void StartDefaultTask(void *argument)
 
 void scanKeysTask(void *argument)
 {
-    const TickType_t xFrequency = 50 / portTICK_PERIOD_MS;
+    const TickType_t xFrequency = 20 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-
-    uint16_t localKeys = 0;
-	uint16_t localKnobs = 0;
-	bool localHKIW = 0;
-	bool localHKIE = 0;
 
     /* Infinite loop */
     for (;;)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        uint16_t localKeys = 0;
+		uint16_t localKnobs = 0;
+		bool localHKIW = 0;
+		bool localHKIE = 0;
 
 		for (int r = 0; r < 7; r++)
 		{
@@ -470,7 +470,7 @@ void scanKeysTask(void *argument)
             }
             else
             {
-                notesPressed[t] = '-';
+                notesPressed[t] = NULL;
             }
         }
 
@@ -544,7 +544,7 @@ void displayUpdateTask(void *argument)
 
         for (int t = 0; t < 12; t++)
         {
-            if (notesPressed[t] != '-')
+            if (notesPressed[t] != NULL)
             {
                 uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
                 u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);

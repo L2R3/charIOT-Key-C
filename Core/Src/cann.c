@@ -134,7 +134,9 @@ void handshake(void *argument) {
 
 			is_receiver = !is_receiver;
 
-			vTaskDelay(500);
+			if (is_receiver) {
+				__atomic_store_n(&volume, 8, __ATOMIC_RELAXED);
+			}
 
 		}
 
