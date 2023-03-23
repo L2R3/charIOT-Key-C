@@ -152,9 +152,11 @@ int main(void)
     MX_DAC1_Init();
     MX_TIM6_Init();
     MX_TIM7_Init();
+    MX_TIM15_Init();
 
     HAL_TIM_Base_Start(&htim7);
     HAL_TIM_Base_Start(&htim6);
+    HAL_TIM_Base_Start(&htim15);
 
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2, (uint32_t *)DDS_OUT, DDS_OUT_SAMPLES, DAC_ALIGN_12B_R);
@@ -209,16 +211,36 @@ int main(void)
 
     // Create threads
     defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+#ifdef SCANKEYS_TEST
     scanKeysHandle = osThreadNew(scanKeysTask, NULL, &scanKeys_attributes);
+#endif
+#ifdef DISPLAY_TEST
     displayUpdateHandle = osThreadNew(displayUpdateTask, NULL, &displayUpdate_attributes);
+#endif
+#ifdef DECODE_TEST
     decodeTaskHandle = osThreadNew(decode, NULL, &decodeTask_attributes);
+#endif
+#ifdef CANTX_TEST
     CAN_TX_TaskNameHandle = osThreadNew(CAN_Transmit, NULL, &CAN_TX_TaskName_attributes);
+#endif
+#ifdef HANDSHAKE_TEST
     handshakeTaskHandle = osThreadNew(handshake, NULL, &handshakeTask_attributes);
+#endif
+#ifdef OUTPUT_TEST
     OutputTaskFirstHalfHandle = osThreadNew(fill_output_first_half, NULL, &OutputTask_attributes);
     OutputTaskSecondHalfHandle = osThreadNew(fill_output_second_half, NULL, &OutputTask_attributes);
+#endif
 
     /* creation of outputFlag */
     outputFlagHandle = osEventFlagsNew(&outputFlag_attributes);
+
+#ifdef TIMING_TEST
+    __disable_irq();
+#endif
+
+#ifdef CANRX_TEST
+    __enable_irq();
+#endif
 
     // Start scheduler
     osKernelStart();
@@ -248,8 +270,18 @@ void fill_output_first_half()
 {
     for (;;)
     {
-        osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
+#ifdef TIMING_TEST
+    	htim15.Instance->CNT = 0;
+#else
+    	osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
+#endif
         synthesise_output1();
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
+
     }
 }
 
@@ -391,7 +423,7 @@ void StartDefaultTask(void *argument)
     for (;;)
     {
         vTaskDelay(1000);
-        char buf[20];
+        //char buf[20];
 
         /*
         uint8_t notes_played [12];
@@ -418,6 +450,10 @@ void scanKeysTask(void *argument)
     for (;;)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+#ifdef TIMING_TEST
+    	htim15.Instance->CNT = 0;
+#endif
 
         uint16_t localKeys = 0;
 		uint16_t localKnobs = 0;
@@ -479,6 +515,12 @@ void scanKeysTask(void *argument)
 
         osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
 
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
+
     }
 
 }
@@ -492,6 +534,10 @@ void displayUpdateTask(void *argument)
     for (;;)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+#ifdef TIMING_TEST
+    	htim15.Instance->CNT = 0;
+#endif
 
         //osMutexAcquire(keysMutexHandle, osWaitForever);
         uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
@@ -580,6 +626,13 @@ void displayUpdateTask(void *argument)
         u8g2_SendBuffer(&u8g2);
 
         HAL_GPIO_TogglePin(LED_BUILTIN_GPIO_Port, LED_BUILTIN_Pin);
+
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
+
     }
 
 }

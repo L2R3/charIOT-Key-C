@@ -11,6 +11,7 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
+TIM_HandleTypeDef htim15;
 
 UART_HandleTypeDef huart2;
 
@@ -29,7 +30,7 @@ void MX_DMA_Init(void) {
 	hdma_memtomem_dma1_channel1.Init.PeriphInc = DMA_PINC_ENABLE;
 	hdma_memtomem_dma1_channel1.Init.MemInc = DMA_MINC_ENABLE;
 	hdma_memtomem_dma1_channel1.Init.PeriphDataAlignment =
-			DMA_PDATAALIGN_HALFWORD;
+	DMA_PDATAALIGN_HALFWORD;
 	hdma_memtomem_dma1_channel1.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
 	hdma_memtomem_dma1_channel1.Init.Mode = DMA_NORMAL;
 	hdma_memtomem_dma1_channel1.Init.Priority = DMA_PRIORITY_HIGH;
@@ -366,6 +367,49 @@ void MX_TIM7_Init(void) {
 }
 
 /**
+ * @brief TIM15 Initialization Function
+ * @param None
+ * @retval None
+ */
+void MX_TIM15_Init(void) {
+
+	/* USER CODE BEGIN TIM15_Init 0 */
+
+	/* USER CODE END TIM15_Init 0 */
+
+	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+	/* USER CODE BEGIN TIM15_Init 1 */
+
+	/* USER CODE END TIM15_Init 1 */
+	htim15.Instance = TIM15;
+	htim15.Init.Prescaler = 80 - 1;
+	htim15.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim15.Init.Period = 65535;
+	htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim15.Init.RepetitionCounter = 0;
+	htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim15) != HAL_OK) {
+		Error_Handler();
+	}
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim15, &sClockSourceConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim15, &sMasterConfig)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM15_Init 2 */
+
+	/* USER CODE END TIM15_Init 2 */
+
+}
+
+/**
  * @brief USART2 Initialization Function
  * @param None
  * @retval None
@@ -416,8 +460,7 @@ void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB,
-			RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin,
-			GPIO_PIN_RESET);
+	RA0_Pin | RA1_Pin | LED_BUILTIN_Pin | RA2_Pin | OUT_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pins : C0_Pin C2_Pin C1_Pin C3_Pin */
 	GPIO_InitStruct.Pin = C0_Pin | C2_Pin | C1_Pin | C3_Pin;

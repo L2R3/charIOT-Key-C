@@ -20,11 +20,20 @@ void decode(void *argument) {
 
 	CanMsg_t RX;
 
-	uint8_t localOctave;
-	int8_t localDiff;
-	uint8_t localPosition;
-
 	for (;;) {
+
+#ifdef TIMING_TEST
+
+		RX.ID = 0x123;
+		RX.Message[0] = 'K';
+		RX.Message[1] = (uint8_t)(0x0FFF & 0x00FF);
+		RX.Message[2] = (uint8_t)((0x0FFF & 0xFF00) >> 8);
+		RX.Message[3] = (uint8_t)keyboard_position;
+
+		osMessageQueuePut(msgInQHandle, &RX, 0, 0);
+
+    	htim15.Instance->CNT = 0;
+#endif
 
 		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
@@ -33,6 +42,7 @@ void decode(void *argument) {
 
 			keyboard_count += 1;
 
+			// not implemented
 			if (RX.Message[1] == TERMINATE) {
 
 				handshakeRequest = 0;
@@ -59,15 +69,43 @@ void decode(void *argument) {
 			break;
 
 		}
+
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
+
 	}
+
 }
 
 void CAN_Transmit(void *argument) {
 	CanMsg_t TX;
 	for (;;) {
+
+#ifdef TIMING_TEST
+		TX.ID = 0x123;
+		TX.Message[0] = 'K';
+		TX.Message[1] = (uint8_t)(0x0FFF & 0x00FF);
+		TX.Message[2] = (uint8_t)((0x0FFF & 0xFF00) >> 8);
+		TX.Message[3] = (uint8_t)keyboard_position;
+
+		osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
+		htim15.Instance->CNT = 0;
+#endif
+
 		osMessageQueueGet(msgOutQHandle, &TX, NULL, osWaitForever);
 		osSemaphoreAcquire(CAN_TX_SemaphoreHandle, osWaitForever);
 		CAN_TX(TX.ID, TX.Message);
+
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
+
 	}
 }
 
@@ -95,7 +133,6 @@ void handshake(void *argument) {
 
 	// keyboard_count is incremented at every received CAN message
 	// -> see the decode task
-	uint8_t localCount = __atomic_load_n(&keyboard_count, __ATOMIC_RELAXED);
 	uint8_t localPosition = keyboard_count - 1;
 	__atomic_store_n(&keyboard_position, localPosition, __ATOMIC_RELAXED);
 	uint8_t localOctave = keyboard_position + 4;
@@ -130,6 +167,11 @@ void handshake(void *argument) {
 
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
+#ifdef TIMING_TEST
+		selected = 1;
+    	htim15.Instance->CNT = 0;
+#endif
+
 		if (selected) {
 
 			is_receiver = !is_receiver;
@@ -139,6 +181,12 @@ void handshake(void *argument) {
 			}
 
 		}
+
+#ifdef TIMING_TEST
+        char timBuf[10];
+        sprintf(timBuf, "%lu", htim15.Instance->CNT);
+        serialPrintln(timBuf);
+#endif
 
 	}
 
@@ -208,9 +256,21 @@ uint32_t CAN_RX(uint32_t *ID, uint8_t data[8]) {
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+
+#ifdef CANRX_TEST
+	htim15.Instance->CNT = 0;
+#endif
+
 	CanMsg_t RX;
 	CAN_RX(&RX.ID, RX.Message);
 	osMessageQueuePut(msgInQHandle, &RX.Message, 0, 0);
+
+#ifdef CANRX_TEST
+	char timBuf[10];
+	sprintf(timBuf, "%lu", htim15.Instance->CNT);
+	serialPrintln(timBuf);
+#endif
+
 }
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
