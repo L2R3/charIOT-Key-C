@@ -6,7 +6,6 @@ osMessageQueueId_t msgInQHandle;
 osMessageQueueId_t msgOutQHandle;
 
 uint32_t UID0;
-bool handshakeRequest = 1;
 volatile uint8_t keyboard_count = 1;
 
 const uint32_t IDout = 0x123;
@@ -15,45 +14,50 @@ const uint32_t IDin = 0x123;
 volatile bool HKIW = false;
 volatile bool HKIE = false;
 
+bool handshakeRequest = 0;
+
 void decode(void *argument) {
+
 	CanMsg_t RX;
 
+	uint8_t localOctave;
+	int8_t localDiff;
+	uint8_t localPosition;
+
 	for (;;) {
+
 		osMessageQueueGet(msgInQHandle, &RX, NULL, osWaitForever);
 
 		switch (RX.Message[0]) {
 		case HANDSHAKE: {
+
 			keyboard_count += 1;
 
-			// termination (UNTESTED)
 			if (RX.Message[1] == TERMINATE) {
 
-				handshakeRequest = 0; // or osEventFlagsClear
-				// write the signals again to check for future disconnections
-
-				//                osMutexAcquire(readMutexHandle, osWaitForever);
-				//                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
-				//                setOutMuxBit(HKOE_BIT, GPIO_PIN_SET);
-				//                osMutexRelease(readMutexHandle);
+				handshakeRequest = 0;
 
 				outbits[5] = 1;
 				outbits[6] = 1;
 
-				// HERE, insert code to (re)start everything else
 			}
+
 		}
 			break;
+
 		case OCTAVE_CHANGE: {
 			octave = RX.Message[2] + keyboard_position - RX.Message[1];
 			int8_t localDiff = keyboard_position - octave;
 			__atomic_store_n(&pos_oct_diff, localDiff, __ATOMIC_RELAXED);
 		}
 			break;
+
 		case KEYS: {
 			uint16_t localKeys = (uint16_t) RX.Message[2] << 8 | RX.Message[1];
 			allKeys[RX.Message[3]] = localKeys;
 		}
 			break;
+
 		}
 	}
 }

@@ -13,8 +13,6 @@
 // display
 #include "csrc/u8g2.h"
 
-osMutexId_t readMutexHandle;
-
 volatile bool outbits[7];
 
 bool is_receiver = 0;
@@ -129,7 +127,6 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value);
 uint8_t u8x8_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 uint8_t u8x8_byte_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 
-void setMuxIO();
 uint8_t readCols();
 
 int16_t changeKnobState(uint8_t knob_state, uint8_t previousKnobState, uint16_t volume, int8_t top_limit,
@@ -191,14 +188,12 @@ int main(void)
     // Mutex creation
     keysMutexHandle = osMutexNew(&keysMutex_attributes);
     knobsMutexHandle = osMutexNew(&knobsMutex_attributes);
-    readMutexHandle = osMutexNew(&readMutex_attributes);
 
     notesMutexHandle = osMutexNew(&notesMutex_attributes);
 
     // Add mutexes
     osMutexRelease(keysMutexHandle);
     osMutexRelease(knobsMutexHandle);
-    osMutexRelease(readMutexHandle);
 
     // Create semaphores
     const osSemaphoreAttr_t CAN_TX_Semaphore_attributes = {.name = "CAN_TX_Semaphore"};
@@ -298,46 +293,6 @@ void selectRow(uint8_t rowIdx)
     HAL_GPIO_WritePin(RA0_GPIO_Port, RA0_Pin, rowIdx & 0x01);
     HAL_GPIO_WritePin(RA1_GPIO_Port, RA1_Pin, rowIdx & 0x02);
     HAL_GPIO_WritePin(RA2_GPIO_Port, RA2_Pin, rowIdx & 0x04);
-}
-
-void setMuxIO()
-{
-
-    uint16_t local_keys = 0;
-    uint16_t local_knobs = 0;
-    bool local_HKIW = 0;
-    bool local_HKIE = 0;
-
-    for (int r = 0; r < 7; r++)
-    {
-        selectRow(r);
-        HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, outbits[r]);
-        HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
-        delayMicro(5);
-        if (r < 3)
-        {
-            local_keys |= readCols() << (r * 4);
-        }
-        else if (r < 5)
-        {
-            local_knobs |= (readCols() << ((r - 3) * 4));
-        }
-        else if (r == 5)
-        {
-            local_HKIW = readCols() >> 3;
-        }
-        else
-        {
-            local_HKIE = readCols() >> 3;
-            selected = ~readCols() & 0x01;
-        }
-        HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
-    }
-
-    __atomic_store_n(&HKIW, local_HKIW, __ATOMIC_RELAXED);
-    __atomic_store_n(&HKIE, local_HKIE, __ATOMIC_RELAXED);
-    __atomic_store_n(&keys, local_keys, __ATOMIC_RELAXED);
-    __atomic_store_n(&knobs, local_knobs, __ATOMIC_RELAXED);
 }
 
 uint8_t readCols()
@@ -460,35 +415,58 @@ void scanKeysTask(void *argument)
     const TickType_t xFrequency = 50 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
+    uint16_t localKeys = 0;
+	uint16_t localKnobs = 0;
+	bool localHKIW = 0;
+	bool localHKIE = 0;
+
     /* Infinite loop */
     for (;;)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        setMuxIO();
-        uint16_t localKeys = __atomic_load_n(&keys, __ATOMIC_RELAXED);
-        uint16_t localKnobs = __atomic_load_n(&knobs, __ATOMIC_RELAXED);
+		for (int r = 0; r < 7; r++)
+		{
+			selectRow(r);
+			HAL_GPIO_WritePin(OUT_GPIO_Port, OUT_Pin, outbits[r]);
+			HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_SET);
+			delayMicro(5);
+			if (r < 3)
+			{
+				localKeys |= readCols() << (r * 4);
+			}
+			else if (r < 5)
+			{
+				localKnobs |= (readCols() << ((r - 3) * 4));
+			}
+			else if (r == 5)
+			{
+				localHKIW = readCols() >> 3;
+			}
+			else
+			{
+				localHKIE = readCols() >> 3;
+				selected = ~readCols() & 0x01;
+			}
+			HAL_GPIO_WritePin(REN_GPIO_Port, REN_Pin, GPIO_PIN_RESET);
+		}
 
+        osMutexAcquire(notesMutexHandle, osWaitForever);
         allKeys[keyboard_position] = localKeys;
+        osMutexRelease(notesMutexHandle);
 
-        // char key_s[16];
-        // sprintf(key_s, "%x", localKeys);
-        // char knobs_s[16];
-        // sprintf(knobs_s, "%x", localKnobs);
-        //
-        // serialPrint("keys: ");
-        // serialPrintln(key_s);
-        // serialPrint("knobs: ");
-        // serialPrintln(knobs_s);
-        uint8_t keys_pressed = 0;
+        __atomic_store_n(&HKIW, localHKIW, __ATOMIC_RELAXED);
+		__atomic_store_n(&HKIE, localHKIE, __ATOMIC_RELAXED);
+		__atomic_store_n(&keys, localKeys, __ATOMIC_RELAXED);
+		__atomic_store_n(&knobs, localKnobs, __ATOMIC_RELAXED);
+
         for (int t = 0; t < 12; t++)
         {
-            bool pressed = ~localKeys & (1 << (t));
+            bool pressed = ~localKeys & (1 << t);
 
             if (pressed)
             {
                 notesPressed[t] = keyNotes[t];
-                keys_pressed += 1;
             }
             else
             {
@@ -500,9 +478,10 @@ void scanKeysTask(void *argument)
         scanKnob(localKnobs, (uint16_t)prev_knobs, 2, 'o');
         scanKnob(localKnobs, (uint16_t)prev_knobs, 1, 'w');
 
+        // set the volume to zero if not receiving
         if (!is_receiver)
         {
-            volume = 0;
+            __atomic_store_n(&volume, 0, __ATOMIC_RELAXED);
         }
 
         CanMsg_t TX;
@@ -514,7 +493,9 @@ void scanKeysTask(void *argument)
         TX.Message[3] = (uint8_t)keyboard_position;
 
         osMessageQueuePut(msgOutQHandle, &TX, 0, 0);
+
     }
+
 }
 
 void displayUpdateTask(void *argument)

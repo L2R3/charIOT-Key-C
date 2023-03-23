@@ -34,11 +34,12 @@ typedef enum {
 void decode(void *argument);
 void CAN_Transmit(void *argument);
 void handshake(void *argument);
+
+// CAN LIBRARY
 uint32_t setCANFilter(uint32_t filterID, uint32_t maskID, uint32_t filterBank);
 uint32_t CAN_TX(uint32_t ID, uint8_t data[8]);
 uint32_t CAN_CheckRXLevel();
 uint32_t CAN_RX(uint32_t *ID, uint8_t data[8]);
-extern void setOutMuxBit(const uint8_t bitIdx, const bool value);
 
 // Device handles
 extern CAN_HandleTypeDef hcan1;
@@ -50,10 +51,7 @@ extern osSemaphoreId_t CAN_TX_SemaphoreHandle;
 extern osMessageQueueId_t msgInQHandle;
 extern osMessageQueueId_t msgOutQHandle;
 
-extern osMutexId_t readMutexHandle;
-
 extern uint32_t UID0;
-extern bool handshakeRequest;
 
 extern const uint32_t IDin;
 
