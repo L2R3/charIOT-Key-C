@@ -39,13 +39,13 @@ The project is built using <b>STM's CubeIDE</b> - meaning you need an installati
 
 The main source files of the project are as follows:
 
-- <a href="./Core/Src/main.h">main.h</a> and <a href="./Core/Src/main.c">main.c</a>: Main project module which instantiates hardware, the relevant RTOS tasks, mutexes etc. Additionally, main contains a few simple RTOS tasks e.g. to read the keys and knobs of the synthesizer and a few HAL interrupt callback definitions.
+- <a href="./Core/Inc/main.h">main.h</a> and <a href="./Core/Src/main.c">main.c</a>: Main project module which instantiates hardware, the relevant RTOS tasks, mutexes etc. Additionally, main contains a few simple RTOS tasks e.g. to read the keys and knobs of the synthesizer and a few HAL interrupt callback definitions.
     
-- <a href="./Core/Src/wavegen.h">wavegen.h</a> and <a href="./Core/Src/wavegen.c">wavegen.c</a>: Code for generating wavetables, displaying which wavetable is currently active and writing the current waveform to the DAC using DMA. The algorithm for generating the waveform is explained in INSERT HERE
+- <a href="./Core/Inc/wavegen.h">wavegen.h</a> and <a href="./Core/Src/wavegen.c">wavegen.c</a>: Code for generating wavetables, displaying which wavetable is currently active and writing the current waveform to the DAC using DMA. The algorithm for generating the waveform is explained in INSERT HERE
     
-- <a href="./Core/Src/cann.h">cann.h</a> and <a href="./Core/Src/cann.c">cann.c</a> contain the code for handshaking with other synthesizers as well as receiving and sending messages using CAN.
+- <a href="./Core/Inc/cann.h">cann.h</a> and <a href="./Core/Src/cann.c">cann.c</a> contain the code for handshaking with other synthesizers as well as receiving and sending messages using CAN.
     
-- <a href="./Core/Src/hardware_config.h">hardware_config.h</a> and <a href="./Core/Src/hardware_config.c">hardware_config.c</a> contains the code to set up the various hardware components e.g. hardware timers, the DAC, ADC etc.
+- <a href="./Core/Inc/hardware_config.h">hardware_config.h</a> and <a href="./Core/Src/hardware_config.c">hardware_config.c</a> contains the code to set up the various hardware components e.g. hardware timers, the DAC, ADC etc.
 
 # Hardware and Functionality
 
