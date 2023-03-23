@@ -25,7 +25,7 @@ bool selected = 0;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
     .name = "defaultTask",
-    .stack_size = 1024 * 4,
+    .stack_size = 128 * 4,
     .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for scanKeys */
@@ -106,7 +106,7 @@ uint16_t octave = 4;
 uint16_t default_octave = 4;
 
 const char *keyNotes[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
-char *notesPressed[12] = {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'};
+char* notesPressed[12];
 
 void StartDefaultTask(void *argument);
 void scanKeysTask(void *argument);
@@ -295,7 +295,7 @@ void fill_output_second_half(void *argument)
 //#ifdef TIMING_TEST
 //        htim15.Instance->CNT = 0;
 //#else
-        osEventFlagsWait(outputFlagHandle, 0x1, osFlagsWaitAny, osWaitForever);
+        osEventFlagsWait(outputFlagHandle, 0x2, osFlagsWaitAny, osWaitForever);
 //#endif
 
         synthesize_output(__atomic_load_n(&keys, __ATOMIC_RELAXED), volume, octave, false);
@@ -525,7 +525,7 @@ void scanKeysTask(void *argument)
             }
             else
             {
-                notesPressed[t] = '-';
+                notesPressed[t] = NULL;
             }
         }
 
@@ -601,7 +601,7 @@ void displayUpdateTask(void *argument)
 
         for (int t = 0; t < 12; t++)
         {
-            if (*notesPressed[t] != '-')
+            if (notesPressed[t] != NULL)
             {
                 uint8_t w = u8g2_GetStrWidth(&u8g2, keyNotes[t]);
                 u8g2_DrawStr(&u8g2, string_size, 7, notesPressed[t]);
