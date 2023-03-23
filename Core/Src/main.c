@@ -31,7 +31,7 @@ osThreadId_t scanKeysHandle;
 const osThreadAttr_t scanKeys_attributes = {
     .name = "scanKeys",
     .stack_size = 128 * 4,
-    .priority = (osPriority_t)osPriorityBelowNormal,
+    .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for displayUpdate */
 osThreadId_t displayUpdateHandle;
@@ -52,7 +52,7 @@ osThreadId_t CAN_TX_TaskNameHandle;
 const osThreadAttr_t CAN_TX_TaskName_attributes = {
     .name = "CAN_TX_TaskName",
     .stack_size = 128 * 4,
-    .priority = (osPriority_t)osPriorityLow,
+    .priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for handshakeTask */
 osThreadId_t handshakeTaskHandle;
@@ -67,7 +67,7 @@ osThreadId_t OutputTaskSecondHalfHandle;
 const osThreadAttr_t OutputTask_attributes = {
     .name = "OutputTask",
     .stack_size = 128 * 4,
-    .priority = (osPriority_t)osPriorityRealtime,
+    .priority = (osPriority_t)osPriorityLow,
 };
 
 /* Definitions for keysMutex */
