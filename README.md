@@ -306,7 +306,7 @@ In rate monotomic scheduling, timing requirements are satisfied if the latency o
 
 <div align=center>
 
-$L_n = \displaystyle\sum_i^n \operatorname{ceil}\bigg(\frac{\tau_n}{\tau_i}\bigg)T_i<\tau_n$
+$L_n = \displaystyle\sum_i^n \mathrm{ceil}\bigg(\frac{\tau_n}{\tau_i}\bigg)T_i<\tau_n$
 </div>
 
 In this case, the sum above evaluates to 890ms, which is smaller than the initialisation interval of 1000ms of the handshake task. As a result, the CPU usage is expected to be around 90%.
