@@ -14,7 +14,7 @@
 
 # Introduction
 <div align=center>
-  <a href="https://imperiallondon.sharepoint.com/:v:/r/sites/charIOT-EE/Shared%20Documents/General/Embedded-LiveVideo-doubleDEMO.mp4?csf=1&web=1&e=f771Mp"> Click here for DEMO videos</a>
+  <a href="https://www.youtube.com/watch?v=21ALKapvIQE"> Click here for DEMO video!</a>
   <p></p>
   
   <a href="https://imperiallondon.sharepoint.com/:v:/r/sites/charIOT-EE/Shared%20Documents/General/Embedded-KEYS-Features.mp4?csf=1&web=1&e=bOCvlk" target="_blank">
